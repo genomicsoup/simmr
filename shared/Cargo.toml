@@ -1,0 +1,15 @@
+[package]
+name = "shared"
+description = "Shared code between simmr and simmrd"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "shared"
+path = "src/lib.rs"
+
+[dependencies]
+bincode = "1.3.3"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
