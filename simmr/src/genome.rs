@@ -103,7 +103,16 @@ impl Genome {
         }
 
         let genome = Genome {
-            uuid: UUID::from(util::generate_id(None)),
+            // this is broken so just disable it for now and replace it with something gross
+            //uuid: UUID::from(util::generate_id(None)),
+            uuid: UUID::from(
+                path::Path::new(&filepath)
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            ),
             filepath: path::PathBuf::from(filepath),
             sequence: sequences.clone(),
             size: sequences.iter().map(|s| s.seq.len()).sum(),

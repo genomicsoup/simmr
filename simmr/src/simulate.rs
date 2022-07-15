@@ -214,7 +214,7 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
 
     // Simulate point mutations using this profile's error distribution
     fwd_read = error_profile.simulate_point_mutations(&fwd_read, &fwd_quality, seed);
-    rev_read = error_profile.simulate_point_mutations(&rev_read, &fwd_quality, seed);
+    rev_read = error_profile.simulate_point_mutations(&rev_read, &rev_quality, seed);
 
     // Finally, fill out the read struct
     let pe_read = PERead {
