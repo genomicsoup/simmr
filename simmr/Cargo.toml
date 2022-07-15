@@ -1,0 +1,25 @@
+[package]
+name = "simmr"
+description = "Simulate metagenomic short and long reads"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "simmr"
+path = "src/main.rs"
+
+[dependencies]
+bincode = "1.3.3"
+clap = { version = "3.1.18", features = ["cargo", "derive", "env"] }
+csv = "1.1"
+needletail = "0.4.1"
+tracing = "0.1.26"
+tracing-subscriber = "0.3"
+rand = "0.8.5"
+rand_distr = "0.4.3"
+serde = { version = "1", features = ["derive"] }
+shared = { path = "../shared" }
+streaming-stats = "0.2.3"
+uuid = { version = "1.1.2", features = ["v4", "fast-rng"] }
+
+[dev-dependencies]
