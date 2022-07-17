@@ -129,7 +129,7 @@ pub struct CliArgs {
         long,
         default_value_t = 150,
         value_parser,
-        help = "Insert size for PE reads (nt)"
+        help = "Insert size for PE reads (nt) [not implemented]"
     )]
     pub insert_size: u16,
 
@@ -138,7 +138,7 @@ pub struct CliArgs {
         long,
         default_value_t = 30,
         value_parser,
-        help = "Average Phred quality score to use during read quality simulation"
+        help = "Average Phred quality score to use during read quality simulation [not implemented]"
     )]
     pub mean_phred_score: u8,
 
@@ -166,7 +166,7 @@ pub struct CliArgs {
     #[clap(
         long,
         value_parser,
-        help = "Generate reads with an average identity of N (compared to their reference)"
+        help = "Generate reads with an average identity of N (compared to their reference) [not implemented]"
     )]
     pub with_ani: Option<u8>,
 
@@ -197,7 +197,8 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
             read_length: args.read_length,
             insert_size: args.insert_size,
         }),
-        ErrorProfile::MinimalLong => todo!(),
+        ErrorProfile::PerfectLong => Box::new(error_profiles::PerfectLongErrorProfile {}),
+        ErrorProfile::MinimalLong => Box::new(error_profiles::MinimalLongErrorProfile {}),
         _ => todo!(),
     }
 }

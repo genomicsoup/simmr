@@ -14,11 +14,7 @@ use rand_distr::{Gamma, Normal};
 use super::base;
 use crate::util;
 
-pub struct PerfectLongErrorProfile {
-    // These are unused by this profile
-    pub read_length: u16,
-    pub insert_size: u16,
-}
+pub struct PerfectLongErrorProfile {}
 
 impl base::ErrorProfile for PerfectLongErrorProfile {
     /**
@@ -124,5 +120,9 @@ impl base::ErrorProfile for PerfectLongErrorProfile {
      */
     fn simulate_errors(&self, sequence: &[u8], seed: Option<u64>) -> Vec<u8> {
         sequence.to_vec()
+    }
+
+    fn is_long_read(&self) -> bool {
+        true
     }
 }

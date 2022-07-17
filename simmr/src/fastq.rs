@@ -6,12 +6,12 @@ use std::fs;
 use std::io::Write;
 
 use crate::genome;
-use crate::simulate::PERead;
+use crate::simulate::SimulatedRead;
 use crate::util;
 
 pub fn write_to_fastq(
     uuid: &genome::UUID,
-    reads: &Vec<PERead>,
+    reads: &Vec<SimulatedRead>,
     output: &str,
     header_format: &str,
     append: bool,
@@ -37,8 +37,6 @@ pub fn write_to_fastq(
             .replace("{:genome_id:}", &uuid.to_string())
             .replace("{:read_id:}", &read.id.to_string())
             .replace("{:pair:}", "2");
-        //let fwd_header = format!("@{}/1", std::str::from_utf8(&read.id).unwrap());
-        //let rev_header = format!("@{}/2", std::str::from_utf8(&read.id).unwrap());
 
         // Again optionize all these b/c we don't care if the writes fail for the msot part
         // write the forward read
@@ -52,16 +50,21 @@ pub fn write_to_fastq(
             .ok();
         file.write_all("\n".as_bytes()).ok();
 
-        // write the reverse read
-        file.write_all(rev_header.as_bytes()).ok();
-        file.write_all("\n".as_bytes()).ok();
-        file.write_all(&read.reverse.sequence).ok();
-        file.write_all("\n".as_bytes()).ok();
-        file.write_all("+".as_bytes()).ok();
-        file.write_all("\n".as_bytes()).ok();
-        file.write_all(&util::encode_quality_scores(&read.reverse.quality))
+        // write the reverse read if it's a PE read
+        if read.reverse.is_some() {
+            file.write_all(rev_header.as_bytes()).ok();
+            file.write_all("\n".as_bytes()).ok();
+            file.write_all(&read.reverse.as_ref().unwrap().sequence)
+                .ok();
+            file.write_all("\n".as_bytes()).ok();
+            file.write_all("+".as_bytes()).ok();
+            file.write_all("\n".as_bytes()).ok();
+            file.write_all(&util::encode_quality_scores(
+                &read.reverse.as_ref().unwrap().quality,
+            ))
             .ok();
-        file.write_all("\n".as_bytes()).ok();
+            file.write_all("\n".as_bytes()).ok();
+        }
     }
 
     Ok(())

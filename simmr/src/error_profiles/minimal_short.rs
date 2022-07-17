@@ -93,4 +93,8 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
             .map(|nt| *nt)
             .collect::<Vec<u8>>()
     }
+
+    fn is_long_read(&self) -> bool {
+        false
+    }
 }

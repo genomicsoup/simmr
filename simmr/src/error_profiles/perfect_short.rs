@@ -44,4 +44,8 @@ impl base::ErrorProfile for PerfectShortErrorProfile {
         // Since this error profile is used to generate perfect reads we don't mutate anything
         sequence.iter().cloned().collect::<Vec<u8>>()
     }
+
+    fn is_long_read(&self) -> bool {
+        false
+    }
 }

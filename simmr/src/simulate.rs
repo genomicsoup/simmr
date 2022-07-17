@@ -46,6 +46,17 @@ pub struct LongRead {
 }
 
 /**
+ * Can model a single PE read or a single long read. In the case of the PE read, forward and reverse will both
+ * be set. For long reads, only the forward read is be used.
+ */
+#[derive(Debug)]
+pub struct SimulatedRead {
+    pub id: u32,
+    pub forward: SingleRead,
+    pub reverse: Option<SingleRead>,
+}
+
+/**
  * FUNCTIONS
  */
 
@@ -87,7 +98,7 @@ pub fn simulate_pe_reads<
     error_profile: &T,
     abundance_profile: &U,
     seed: Option<u64>,
-) -> Vec<(path::PathBuf, genome::UUID, usize, f64, Vec<PERead>)> {
+) -> Vec<(path::PathBuf, genome::UUID, usize, f64, Vec<SimulatedRead>)> {
     // Figure out abundance levels
     //let abundances = abundance_profile.determine_abundances(num_reads, &genomes);
     let abundances = abundance_profile.determine_abundances(num_reads, genomes.len());
@@ -128,7 +139,7 @@ pub fn simulate_pe_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>(
     genome: &genome::Genome,
     error_profile: &T,
     seed: Option<u64>,
-) -> Result<Vec<PERead>, String> {
+) -> Result<Vec<SimulatedRead>, String> {
     let mut reads = Vec::new();
     let mut rng = match seed {
         Some(s) => StdRng::seed_from_u64(s),
@@ -166,7 +177,7 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
     sequence: &genome::Seq,
     error_profile: &T,
     seed: Option<u64>,
-) -> Result<PERead, String> {
+) -> Result<SimulatedRead, String> {
     let read_length = error_profile.get_read_length() as usize;
     let insert_size = error_profile.get_insert_size() as usize;
 
@@ -217,19 +228,19 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
     rev_read = error_profile.simulate_point_mutations(&rev_read, &rev_quality, seed);
 
     // Finally, fill out the read struct
-    let pe_read = PERead {
+    let pe_read = SimulatedRead {
         id: get_read_id(),
         forward: SingleRead {
             sequence: fwd_read,
             quality: fwd_quality,
         },
-        reverse: SingleRead {
+        reverse: Some(SingleRead {
             // Don't forget the reverse read must be the reverse complement since it is sequenced
             // from 3' -> 5'
             // TODO: move this up before mutation occurs?
             sequence: util::reverse_complement(&rev_read),
             quality: rev_quality,
-        },
+        }),
     };
 
     Ok(pe_read)
@@ -263,7 +274,7 @@ pub fn simulate_long_reads<
     error_profile: &T,
     abundance_profile: &U,
     seed: Option<u64>,
-) -> Vec<(path::PathBuf, genome::UUID, usize, f64, Vec<LongRead>)> {
+) -> Vec<(path::PathBuf, genome::UUID, usize, f64, Vec<SimulatedRead>)> {
     // Figure out abundance levels
     let abundances = abundance_profile.determine_abundances(num_reads, genomes.len());
     let mut all_reads = Vec::new();
@@ -303,7 +314,7 @@ pub fn simulate_long_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>
     genome: &genome::Genome,
     error_profile: &T,
     seed: Option<u64>,
-) -> Result<Vec<LongRead>, String> {
+) -> Result<Vec<SimulatedRead>, String> {
     let mut reads = Vec::new();
     let mut rng = match seed {
         Some(s) => StdRng::seed_from_u64(s),
@@ -344,7 +355,7 @@ pub fn simulate_long_read<T: error_profiles::ErrorProfile + ?Sized>(
     sequence: &genome::Seq,
     error_profile: &T,
     seed: Option<u64>,
-) -> Result<LongRead, String> {
+) -> Result<SimulatedRead, String> {
     // The genome might not be long enough for our random read length, so try a few times and
     // if doesn't work out move to another genome.
     let mut read_length = error_profile.get_random_read_length(seed);
@@ -396,12 +407,13 @@ pub fn simulate_long_read<T: error_profiles::ErrorProfile + ?Sized>(
     read_sequence = error_profile.simulate_point_mutations(&read_sequence, &read_quality, seed);
 
     // Finally, fill out the read struct
-    let long_read = LongRead {
+    let long_read = SimulatedRead {
         id: get_read_id(),
-        read: SingleRead {
+        forward: SingleRead {
             sequence: read_sequence,
             quality: read_quality,
         },
+        reverse: None,
     };
 
     Ok(long_read)

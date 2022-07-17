@@ -141,7 +141,11 @@ fn run_main() {
     info!("Simulating reads");
 
     // Simulate reads
-    let reads = simulate::simulate_pe_reads(args.num_reads, &genomes, &eprofile, &aprofile, None);
+    let reads = if eprofile.is_long_read() {
+        simulate::simulate_long_reads(args.num_reads, &genomes, &eprofile, &aprofile, None)
+    } else {
+        simulate::simulate_pe_reads(args.num_reads, &genomes, &eprofile, &aprofile, None)
+    };
 
     info!("Writing simulated reads to {}", args.output);
 
@@ -227,38 +231,4 @@ fn run_main() {
 
 fn main() {
     run_main();
-    //let args = cli::parse_cli_args();
-
-    //let mut rng = StdRng::seed_from_u64(42);
-    //let seq: usize = rng.gen_range(0..1);
-    //let seed = rng.gen();
-    ////let mut rng = match seed {
-    ////    Some(s) => StdRng::seed_from_u64(s),
-    ////    None => StdRng::from_entropy(),
-    ////};
-
-    //let mut new_rng = StdRng::seed_from_u64(seed);
-    //let fwd_start: usize = new_rng.gen_range(0..60);
-    //// Forward read starts and ends
-    ////let fwd_start: usize = rng.gen_range(0..60);
-
-    ////println!("{}", seq);
-    ////println!("{}", seed);
-    ////println!("{}", fwd_start);
-
-    //println!("{}", util::encode_quality_score(0));
-    //println!("{}", util::encode_quality_score(1));
-    //println!("{}", util::encode_quality_score(10));
-    //println!("{}", util::encode_quality_score(41));
-
-    //println!("{:?}", args.genome);
-
-    //let mut rng = rand_pcg::Pcg64::seed_from_u64(42);
-
-    //println!("{}", rng.gen::<u32>());
-
-    //let mut rng2 = rand_pcg::Pcg64::seed_from_u64(42);
-
-    //println!("{}", rng2.gen::<u32>());
-    //println!("{}", rng2.gen::<u32>());
 }

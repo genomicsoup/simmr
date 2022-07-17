@@ -224,6 +224,10 @@ impl base::ErrorProfile for CustomLongErrorProfile {
     ) -> Vec<u8> {
         sequence.to_vec()
     }
+
+    fn is_long_read(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

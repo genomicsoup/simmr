@@ -27,6 +27,8 @@ pub trait ErrorProfile {
     fn minimum_genome_size(&self) -> u16 {
         2 * self.get_read_length() + self.get_insert_size()
     }
+    // Returns true if the error profile is used for generating long reads
+    fn is_long_read(&self) -> bool;
 }
 
 impl<T: ?Sized> ErrorProfile for Box<T>
@@ -64,5 +66,9 @@ where
 
     fn minimum_genome_size(&self) -> u16 {
         (**self).minimum_genome_size()
+    }
+
+    fn is_long_read(&self) -> bool {
+        (**self).is_long_read()
     }
 }

@@ -49,7 +49,7 @@ impl PartialEq for UUID {
 // Convenience methods for converting some types into a UUID
 impl From<u64> for UUID {
     fn from(u: u64) -> Self {
-        UUID(u.to_ne_bytes().to_vec())
+        UUID(format!("{:x}", u).as_bytes().to_vec())
     }
 }
 
@@ -104,15 +104,7 @@ impl Genome {
 
         let genome = Genome {
             // this is broken so just disable it for now and replace it with something gross
-            //uuid: UUID::from(util::generate_id(None)),
-            uuid: UUID::from(
-                path::Path::new(&filepath)
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-            ),
+            uuid: UUID::from(util::generate_id(None)),
             filepath: path::PathBuf::from(filepath),
             sequence: sequences.clone(),
             size: sequences.iter().map(|s| s.seq.len()).sum(),
