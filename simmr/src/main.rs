@@ -142,9 +142,9 @@ fn run_main() {
 
     // Simulate reads
     let reads = if eprofile.is_long_read() {
-        simulate::simulate_long_reads(args.num_reads, &genomes, &eprofile, &aprofile, None)
+        simulate::simulate_long_reads(args.num_reads, &genomes, &eprofile, &aprofile, args.seed)
     } else {
-        simulate::simulate_pe_reads(args.num_reads, &genomes, &eprofile, &aprofile, None)
+        simulate::simulate_pe_reads(args.num_reads, &genomes, &eprofile, &aprofile, args.seed)
     };
 
     info!("Writing simulated reads to {}", args.output);

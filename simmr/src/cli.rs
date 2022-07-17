@@ -178,6 +178,9 @@ pub struct CliArgs {
         help = READ_FORMAT_HELP
     )]
     pub read_header_format: String,
+
+    #[clap(long, value_parser, help = "Random seed")]
+    pub seed: Option<u64>,
 }
 
 /**
