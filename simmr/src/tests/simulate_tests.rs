@@ -37,11 +37,20 @@ fn test_simulate_pe_read_using_zero_error_profile() {
     // reverse read complement, ACCAATGGACGGCACTCATT
     // reverse read reverse complement, TTACTCACGGCAGGTAACCA
     //assert!(std::str::from_utf8(&pe_read.reverse.sequence).unwrap() == "ACCAATGGACGGCACTCATT");
-    assert!(std::str::from_utf8(&pe_read.reverse.sequence).unwrap() == "TTACTCACGGCAGGTAACCA");
+    assert!(
+        std::str::from_utf8(&pe_read.reverse.as_ref().unwrap().sequence).unwrap()
+            == "TTACTCACGGCAGGTAACCA"
+    );
 
     // "perfect" quality scores
     assert!(pe_read.forward.quality.iter().all(|q| *q == 60));
-    assert!(pe_read.reverse.quality.iter().all(|q| *q == 60));
+    assert!(pe_read
+        .reverse
+        .as_ref()
+        .unwrap()
+        .quality
+        .iter()
+        .all(|q| *q == 60));
     //assert!(std::str::from_utf8(&pe_read.id)
     //    .unwrap()
     //    .contains("R0:seq_id="));
@@ -72,11 +81,20 @@ fn test_simulate_reads_using_zero_error_profile() {
     // reverse read complement, TCTGAACTGGTTACCTGCCG
     // reverse read reverse complement, TGCTATCAGACACTCTTTTT
     //assert!(std::str::from_utf8(&pe_read.reverse.sequence).unwrap() == "TTTTTCTCACAGACTATCGT");
-    assert!(std::str::from_utf8(&pe_read.reverse.sequence).unwrap() == "TGCTATCAGACACTCTTTTT");
+    assert!(
+        std::str::from_utf8(&pe_read.reverse.as_ref().unwrap().sequence).unwrap()
+            == "TGCTATCAGACACTCTTTTT"
+    );
 
     // "perfect" quality scores
     assert!(pe_read.forward.quality.iter().all(|q| *q == 60));
-    assert!(pe_read.reverse.quality.iter().all(|q| *q == 60));
+    assert!(pe_read
+        .reverse
+        .as_ref()
+        .unwrap()
+        .quality
+        .iter()
+        .all(|q| *q == 60));
     //assert!(std::str::from_utf8(&pe_read.id)
     //    .unwrap()
     //    .contains("R0:seq_id="));
