@@ -3,14 +3,14 @@
 
 `simmr`, short for **sim**ulating **m**etagenomic **r**eads, can be used to simulate short and 
 long reads from a set of genome assemblies.
-Written in Rust, `simmr` is designed to be fairly fast and efficient, and comes with a set of 
-easy-to-use default options for read simulation.
+Written in Rust, `simmr` is designed to be fairly fast and efficient, and comes with a 
+simple set of options for read simulation.
 Although it's primarily intended to generate metagenomic samples (and some of the empirical 
 distributions it uses reflects this), it should work with assemblies from any organism.
 
 ## Usage
 
-Simulating a set of 5000 perfect paired-end (PE) reads from a single genome is as easy as
+Simulate a set of 5000 perfect paired-end (PE) reads from a single genome
 
 ```bash
 $ simmr --genome my-genome.fa --num-reads 5000 --output my-reads.fq
@@ -214,3 +214,4 @@ OPTIONS:
 - [] Respect the `--mean-phred-score` parameter
 - [] Handle additional CIGAR string characters.
     - Currently handles D, H, I, M, and S
+- [] Flesh out readme

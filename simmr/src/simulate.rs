@@ -18,8 +18,8 @@ use crate::util;
  */
 
 /**
- * Models a single read which is a sequence of nucleotides and their corresponding quality scores.
- */
+ Models a single read which is a sequence of nucleotides and their corresponding quality scores.
+*/
 #[derive(Debug)]
 pub struct SingleRead {
     pub sequence: Vec<u8>,
@@ -27,8 +27,8 @@ pub struct SingleRead {
 }
 
 /**
- * Models a single PE read consisting of a unique ID and forward/reverse reads.
- */
+ Models a single PE read consisting of a unique ID and forward/reverse reads.
+*/
 #[derive(Debug)]
 pub struct PERead {
     pub id: u32,
@@ -37,8 +37,8 @@ pub struct PERead {
 }
 
 /**
- * Models a single long read
- */
+ Models a single long read
+*/
 #[derive(Debug)]
 pub struct LongRead {
     pub id: u32,
@@ -46,9 +46,9 @@ pub struct LongRead {
 }
 
 /**
- * Can model a single PE read or a single long read. In the case of the PE read, forward and reverse will both
- * be set. For long reads, only the forward read is be used.
- */
+ Can model a single PE read or a single long read. In the case of the PE read, forward and reverse will both
+ be set. For long reads, only the forward read is be used.
+*/
 #[derive(Debug)]
 pub struct SimulatedRead {
     pub id: u32,
@@ -61,9 +61,9 @@ pub struct SimulatedRead {
  */
 
 /**
- * Keeps track of simulated read IDs across genomes. Returns and increments the current read ID
- * when a new simulated read is generated.
- */
+ Keeps track of simulated read IDs across genomes. Returns and increments the current read ID
+ when a new simulated read is generated.
+*/
 fn get_read_id() -> u32 {
     static READ_ID: AtomicU32 = AtomicU32::new(0);
 
@@ -71,24 +71,24 @@ fn get_read_id() -> u32 {
 }
 
 /**
- * Simulate reads using the given genomes and error profile. This function also determines
- * genome abundances using the provided abundance profile.
- *
- * args
- *  num_reads:         total number of reads to generate
- *  genomes:           genomes to use
- *  error_profile:     error profile to use when simulating sequencing errors
- *  abundance_profile: genome abundance profile
- *  seed:              an optional seed for reproducibility
- *
- * returns
- *  a vector containing simulation metadata and the simulated reads, each element:
- *      0: path to the original genome
- *      1: generated unique ID for the genome
- *      2: number of reads simulated from this genome
- *      3: genome abundance
- *      4: simulated reads
- */
+ Simulate reads using the given genomes and error profile. This function also determines
+ genome abundances using the provided abundance profile.
+
+ args
+  num_reads:         total number of reads to generate
+  genomes:           genomes to use
+  error_profile:     error profile to use when simulating sequencing errors
+  abundance_profile: genome abundance profile
+  seed:              an optional seed for reproducibility
+
+ returns
+    - a vector containing simulation metadata and the simulated reads, each element:
+        - 0: path to the original genome
+        - 1: generated unique ID for the genome
+        - 2: number of reads simulated from this genome
+        - 3: genome abundance
+        - 4: simulated reads
+*/
 pub fn simulate_pe_reads<
     T: error_profiles::ErrorProfile + ?Sized,
     U: abundance_profiles::AbundanceProfile + ?Sized,
@@ -99,9 +99,19 @@ pub fn simulate_pe_reads<
     abundance_profile: &U,
     seed: Option<u64>,
 ) -> Vec<(path::PathBuf, genome::UUID, usize, f64, Vec<SimulatedRead>)> {
-    // Figure out abundance levels
-    //let abundances = abundance_profile.determine_abundances(num_reads, &genomes);
-    let abundances = abundance_profile.determine_abundances(num_reads, genomes.len());
+    // Figure out abundance levels, adjust for genome size if necessary
+    let abundances = if abundance_profile.is_size_aware() {
+        let unsized_abundances = abundance_profile.determine_abundances(num_reads, genomes.len());
+
+        abundance_profile.adjust_for_size(
+            &genomes,
+            &unsized_abundances,
+            error_profile.get_read_length() as usize,
+            true,
+        )
+    } else {
+        abundance_profile.determine_abundances(num_reads, genomes.len())
+    };
     let mut all_reads = Vec::new();
 
     for ((genome_reads, abundance), genome) in abundances.iter().zip(genomes.iter()) {
@@ -122,18 +132,18 @@ pub fn simulate_pe_reads<
 }
 
 /**
- * Simulate a set of paired end reads, up to num_reads, using sequences from the given genome, and
- * according to an error profile.
- *
- * args
- *  num_reads:     the number of PE reads to generate
- *  genome:        genome to use for simulation
- *  error_profile: error profile to use when simulating sequencing errors
- *  seed:          an optional seed for reproducibility
- *
- * returns
- *  a result containing either an error string or the set of simulated PE reads
- */
+Simulate a set of paired end reads, up to num_reads, using sequences from the given genome, and
+according to an error profile.
+
+args
+   - num_reads:     the number of PE reads to generate
+   - genome:        genome to use for simulation
+   - error_profile: error profile to use when simulating sequencing errors
+   - seed:          an optional seed for reproducibility
+
+returns
+   - a result containing either an error string or the set of simulated PE reads
+*/
 pub fn simulate_pe_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>(
     num_reads: usize,
     genome: &genome::Genome,
@@ -160,18 +170,18 @@ pub fn simulate_pe_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>(
 }
 
 /**
- * Simulate a single paired end read using the given sequence from a single genome and according
- * to an error profile and distribution.
- *
- * args
- *  sequence:      a sequence record from a genome
- *  error_profile: error profile to use when simulating sequencing errors
- *  read_id:       generated and unique read ID to assign to the simulated read
- *  seed:          an optional seed for reproducibility
- *
- * returns
- *  a result containing either an error or the simulated PE read
- */
+Simulate a single paired end read using the given sequence from a single genome and according
+to an error profile and distribution.
+
+args
+   - sequence:      a sequence record from a genome
+   - error_profile: error profile to use when simulating sequencing errors
+   - read_id:       generated and unique read ID to assign to the simulated read
+   - seed:          an optional seed for reproducibility
+
+returns
+   - a result containing either an error or the simulated PE read
+*/
 pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
     //genome: &genome::Genome,
     sequence: &genome::Seq,

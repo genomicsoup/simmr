@@ -181,6 +181,14 @@ pub struct CliArgs {
 
     #[clap(long, value_parser, help = "Random seed")]
     pub seed: Option<u64>,
+
+    // With
+    #[clap(
+        long,
+        value_parser,
+        help = "Account for genome size when simulating reads at different abundances"
+    )]
+    pub consider_size: bool,
 }
 
 /**
@@ -213,8 +221,10 @@ pub fn determine_abundance_profile(
     args: &CliArgs,
 ) -> Box<dyn abundance_profiles::AbundanceProfile> {
     match args.abundance_profile {
-        AbundanceProfile::Full => Box::new(abundance_profiles::UniformAbundanceProfile {}),
-        AbundanceProfile::Uniform => Box::new(abundance_profiles::UniformAbundanceProfile {}),
+        AbundanceProfile::Full => Box::new(abundance_profiles::ExactAbundanceProfile {}),
+        AbundanceProfile::Uniform => Box::new(abundance_profiles::UniformAbundanceProfile {
+            size_aware: args.consider_size,
+        }),
     }
 }
 
