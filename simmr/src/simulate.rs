@@ -405,39 +405,23 @@ pub fn simulate_long_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>
 } */
 
 /**
- * Simulate a single long read using the given sequence from a single genome and according
- * to an error profile and distribution.
- *
- * args
- *  sequence:      a sequence record from a genome
- *  error_profile: error profile to use when simulating sequencing errors
- *  seed:          an optional seed for reproducibility
- *
- * returns
- *  a result containing either an error or the simulated read
- */
+Simulate a single long read using the given sequence from a single genome and according
+to an error profile and distribution.
+
+args
+   - sequence:      a sequence record from a genome
+   - error_profile: error profile to use when simulating sequencing errors
+   - seed:          an optional seed for reproducibility
+
+returns
+   - a result containing either an error or the simulated read
+*/
 pub fn simulate_long_read<T: error_profiles::ErrorProfile + ?Sized>(
     sequence: &genome::Seq,
     read_length: u16,
     error_profile: &T,
     seed: Option<u64>,
 ) -> Result<SimulatedRead, String> {
-    // The genome might not be long enough for our random read length, so try a few times and
-    // if doesn't work out move to another genome.
-    //let mut read_length = error_profile.get_random_read_length(seed);
-
-    //if sequence.size <= read_length as usize {
-    //    for _ in 0..10 {
-    //        read_length = error_profile.get_random_read_length(seed);
-
-    //        if read_length as usize > sequence.size {
-    //            break;
-    //        }
-    //    }
-    //}
-
-    // It's possible the size is still smaller than the read length, if so we'll return an
-    // error and try a new genome
     // Should never happen...
     if sequence.size <= read_length as usize {
         return Err(format!(
