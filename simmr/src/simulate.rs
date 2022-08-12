@@ -257,24 +257,24 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
 }
 
 /**
- * Simulate long reads using the given genomes and error profile. This function also determines
- * genome abundances using the provided abundance profile.
- *
- * args
- *  num_reads:         total number of reads to generate
- *  genomes:           genomes to use
- *  error_profile:     error profile to use when simulating sequencing errors
- *  abundance_profile: genome abundance profile
- *  seed:              an optional seed for reproducibility
- *
- * returns
- *  a vector containing simulation metadata and the simulated reads, each element:
- *      0: path to the original genome
- *      1: generated unique ID for the genome
- *      2: number of reads simulated from this genome
- *      3: genome abundance
- *      4: simulated reads
- */
+Simulate long reads using the given genomes and error profile. This function also determines
+genome abundances using the provided abundance profile.
+
+args
+   - num_reads:         total number of reads to generate
+   - genomes:           genomes to use
+   - error_profile:     error profile to use when simulating sequencing errors
+   - abundance_profile: genome abundance profile
+   - seed:              an optional seed for reproducibility
+
+returns
+   - a vector containing simulation metadata and the simulated reads, each element:
+       - 0: path to the original genome
+       - 1: generated unique ID for the genome
+       - 2: number of reads simulated from this genome
+       - 3: genome abundance
+       - 4: simulated reads
+*/
 pub fn simulate_long_reads<
     T: error_profiles::ErrorProfile + ?Sized,
     U: abundance_profiles::AbundanceProfile + ?Sized,
@@ -287,11 +287,53 @@ pub fn simulate_long_reads<
 ) -> Vec<(path::PathBuf, genome::UUID, usize, f64, Vec<SimulatedRead>)> {
     // Figure out abundance levels
     let abundances = abundance_profile.determine_abundances(num_reads, genomes.len());
+    // Will contain all simulated reads
     let mut all_reads = Vec::new();
+    // Simulated read count for a single genome
+    let mut simulated_read_count: usize = 0;
+    let mut rng = match seed {
+        Some(s) => StdRng::seed_from_u64(s),
+        None => StdRng::from_entropy(),
+    };
 
     for ((genome_reads, abundance), genome) in abundances.iter().zip(genomes.iter()) {
-        let reads =
-            simulate_long_reads_from_genome(*genome_reads, genome, error_profile, seed).unwrap();
+        let mut current_reads = Vec::new();
+
+        while simulated_read_count < *genome_reads {
+            // Select a random read size for this read
+            let mut read_length = error_profile.get_random_read_length(seed);
+
+            // Can we actually generate reads of this length from sequences in this genome?
+            // TODO: better way to do this?
+            let usable_seqs: Vec<genome::Seq> = genome
+                .sequence
+                .iter()
+                .filter(|s| s.size > read_length as usize)
+                .cloned()
+                .collect();
+
+            // No sequences are larger than the read length we select, so try a new read length
+            if usable_seqs.len() == 0 {
+                continue;
+            };
+
+            // Select a random sequence
+            let seq = usable_seqs[rng.gen_range(0..usable_seqs.len())].clone();
+
+            // Seed for the actual read simulation
+            let read_seed: u64 = rng.gen();
+
+            let simulated =
+                match simulate_long_read(&seq, read_length, error_profile, Some(read_seed)) {
+                    Ok(r) => r,
+                    Err(e) => continue,
+                };
+
+            current_reads.push(simulated);
+            simulated_read_count += 1;
+        }
+        //let reads =
+        //    simulate_long_reads_from_genome(*genome_reads, genome, error_profile, seed).unwrap();
 
         // Collect+asociate reads with genome metadata for output
         all_reads.push((
@@ -299,8 +341,11 @@ pub fn simulate_long_reads<
             genome.uuid.clone(),
             *genome_reads,
             *abundance,
-            reads,
+            current_reads,
         ));
+
+        // Clear read count
+        simulated_read_count = 0;
     }
 
     all_reads
@@ -319,6 +364,7 @@ pub fn simulate_long_reads<
  * returns
  *  a result containing either an error string or the set of simulated PE reads
  */
+/*
 pub fn simulate_long_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>(
     num_reads: usize,
     genome: &genome::Genome,
@@ -347,7 +393,7 @@ pub fn simulate_long_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>
     }
 
     Ok(reads)
-}
+} */
 
 /**
  * Simulate a single long read using the given sequence from a single genome and according
@@ -363,25 +409,27 @@ pub fn simulate_long_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>
  */
 pub fn simulate_long_read<T: error_profiles::ErrorProfile + ?Sized>(
     sequence: &genome::Seq,
+    read_length: u16,
     error_profile: &T,
     seed: Option<u64>,
 ) -> Result<SimulatedRead, String> {
     // The genome might not be long enough for our random read length, so try a few times and
     // if doesn't work out move to another genome.
-    let mut read_length = error_profile.get_random_read_length(seed);
+    //let mut read_length = error_profile.get_random_read_length(seed);
 
-    if sequence.size <= read_length as usize {
-        for _ in 0..10 {
-            read_length = error_profile.get_random_read_length(seed);
+    //if sequence.size <= read_length as usize {
+    //    for _ in 0..10 {
+    //        read_length = error_profile.get_random_read_length(seed);
 
-            if read_length as usize > sequence.size {
-                break;
-            }
-        }
-    }
+    //        if read_length as usize > sequence.size {
+    //            break;
+    //        }
+    //    }
+    //}
 
     // It's possible the size is still smaller than the read length, if so we'll return an
     // error and try a new genome
+    // Should never happen...
     if sequence.size <= read_length as usize {
         return Err(format!(
             "Genome size ({}nt) is smaller than the read length ({})",
@@ -401,14 +449,14 @@ pub fn simulate_long_read<T: error_profiles::ErrorProfile + ?Sized>(
     // if the end of the read is out of bounds, then regenerate the end position
     if read_end >= sequence.size {
         read_end = rng.gen_range(read_start..sequence.size);
-        read_length = (read_end - read_start) as u16;
+        //read_length = (read_end - read_start) as u16;
     }
 
     // Generate the sequence from the genome
     let mut read_sequence = sequence.seq[read_start..read_end].to_owned();
 
-    // Generate quality scores
-    let read_quality = error_profile.simulate_phred_scores(read_length as usize, seed);
+    // Generate quality scores, use end - start in case the read_length changed
+    let read_quality = error_profile.simulate_phred_scores(read_end - read_start, seed);
 
     // Simulate errors, this only modifies the sequence if using a custom profile
     read_sequence = error_profile.simulate_errors(&read_sequence, seed);

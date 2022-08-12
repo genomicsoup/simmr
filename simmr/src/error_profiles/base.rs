@@ -24,9 +24,7 @@ pub trait ErrorProfile {
     fn simulate_errors(&self, sequence: &[u8], seed: Option<u64>) -> Vec<u8>;
     // Calculate the minimum genome size necessary to simulate reads using the given read length
     // and insert sizes
-    fn minimum_genome_size(&self) -> u16 {
-        2 * self.get_read_length() + self.get_insert_size()
-    }
+    fn minimum_genome_size(&self) -> u16;
     // Returns true if the error profile is used for generating long reads
     fn is_long_read(&self) -> bool;
 }

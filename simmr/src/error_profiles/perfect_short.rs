@@ -45,6 +45,10 @@ impl base::ErrorProfile for PerfectShortErrorProfile {
         sequence.iter().cloned().collect::<Vec<u8>>()
     }
 
+    fn minimum_genome_size(&self) -> u16 {
+        2 * self.get_read_length() + self.get_insert_size()
+    }
+
     fn is_long_read(&self) -> bool {
         false
     }

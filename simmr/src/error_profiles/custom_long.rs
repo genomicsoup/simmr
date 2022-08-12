@@ -225,6 +225,10 @@ impl base::ErrorProfile for CustomLongErrorProfile {
         sequence.to_vec()
     }
 
+    fn minimum_genome_size(&self) -> u16 {
+        20_000
+    }
+
     fn is_long_read(&self) -> bool {
         true
     }

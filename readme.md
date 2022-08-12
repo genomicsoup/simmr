@@ -202,6 +202,7 @@ OPTIONS:
 ## TODOs
 
 - [] Account for genome size when determining abundances
+- [] Finish custom distribution implementation
 - [] Distribution testing and plots
 - [] Add `--ani` option to generate sequences with an ANI close to the reference
 - [] Parallelize simulation and distribution functions
@@ -215,3 +216,5 @@ OPTIONS:
 - [] Handle additional CIGAR string characters.
     - Currently handles D, H, I, M, and S
 - [] Flesh out readme
+- [] Streaming-ish operations (as opposed to holding everything in memory then writing to disk)
+- [] Tweakable long read lengths

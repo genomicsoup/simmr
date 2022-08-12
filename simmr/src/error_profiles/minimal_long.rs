@@ -122,6 +122,12 @@ impl base::ErrorProfile for MinimalLongErrorProfile {
         sequence.to_vec()
     }
 
+    // TODO: Hardcoded to the mean read length for long reads, should make this
+    // user configurable
+    fn minimum_genome_size(&self) -> u16 {
+        20_000
+    }
+
     fn is_long_read(&self) -> bool {
         true
     }
