@@ -14,7 +14,7 @@ use crate::error_profiles;
 static ABUNDANCE_HELP: &'static str = "
 Genome abundances for the set of simulated reads.
 
-<full>    generates NUM_READS for each genome
+<exact>   generates exactly NUM_READS for each genome
 <uniform> uniformly distributes abundances across each genome
 
 ";
@@ -73,7 +73,7 @@ pub enum ErrorProfile {
 pub enum AbundanceProfile {
     // Similar to a uniform distribution but for each genome, we generate all reads, provided
     // by the --num-reads option, instead of dividing by the number of genomes
-    Full,
+    Exact,
     /// Generates a uniform abundance of all input genomes
     Uniform,
 }
@@ -221,7 +221,7 @@ pub fn determine_abundance_profile(
     args: &CliArgs,
 ) -> Box<dyn abundance_profiles::AbundanceProfile> {
     match args.abundance_profile {
-        AbundanceProfile::Full => Box::new(abundance_profiles::ExactAbundanceProfile {}),
+        AbundanceProfile::Exact => Box::new(abundance_profiles::ExactAbundanceProfile {}),
         AbundanceProfile::Uniform => Box::new(abundance_profiles::UniformAbundanceProfile {
             size_aware: args.consider_size,
         }),

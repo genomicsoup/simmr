@@ -201,14 +201,14 @@ OPTIONS:
 
 ## TODOs
 
-- [] Account for genome size when determining abundances
+- [x] Account for genome size when determining abundances
+- [x] Additional abundance options
 - [] Finish custom distribution implementation
 - [] Distribution testing and plots
 - [] Add `--ani` option to generate sequences with an ANI close to the reference
 - [] Parallelize simulation and distribution functions
 - [] Provide an option for generating separate FASTQs for each read pair (non-interleaved outputs)
 - [] Provide an option for writing metadata output to a different filepath
-- [] Additional abundance options
 - [] IUPAC support
 - [] Additional tests
 - [] Simulate inner distances and insert sizes

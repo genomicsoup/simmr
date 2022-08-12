@@ -286,7 +286,16 @@ pub fn simulate_long_reads<
     seed: Option<u64>,
 ) -> Vec<(path::PathBuf, genome::UUID, usize, f64, Vec<SimulatedRead>)> {
     // Figure out abundance levels
-    let abundances = abundance_profile.determine_abundances(num_reads, genomes.len());
+    let abundances = if abundance_profile.is_size_aware() {
+        let unsized_abundances = abundance_profile.determine_abundances(num_reads, genomes.len());
+
+        // TODO: make long read lengths configurable
+        // TODO: figure out a better estimate for long read abundances, one that doesn't just
+        //       use the mean read length but accounts for the different lengths
+        abundance_profile.adjust_for_size(&genomes, &unsized_abundances, 20_000 as usize, false)
+    } else {
+        abundance_profile.determine_abundances(num_reads, genomes.len())
+    };
     // Will contain all simulated reads
     let mut all_reads = Vec::new();
     // Simulated read count for a single genome
