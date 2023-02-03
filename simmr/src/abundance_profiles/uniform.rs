@@ -58,10 +58,6 @@ impl base::AbundanceProfile for UniformAbundanceProfile {
             paired,
         );
         let total_reads: f64 = read_abundances.iter().map(|(n, _)| *n as f64).sum();
-        println!("total coverage: {}", total_coverage);
-        println!("total reads: {}", total_reads);
-        println!("read length: {}", read_length);
-        println!("abunds: {:?}", read_abundances);
 
         // Adjust the number of reads to simulate based on genome size adjustments. The rel.
         // abundance will stay the same but reads per genome may change. See trait docstring
@@ -71,11 +67,6 @@ impl base::AbundanceProfile for UniformAbundanceProfile {
             .into_iter()
             .zip(read_abundances)
             .map(|(g, (nreads, abund))| {
-                println!("gsize: {}", g.size);
-                println!(
-                    "coverage: {}",
-                    base::coverage(*nreads, read_length, g.size, paired)
-                );
                 (
                     ((total_coverage * total_reads * (*abund / 100.0))
                         / base::coverage(*nreads, read_length, g.size, true))
