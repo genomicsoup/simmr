@@ -5,7 +5,7 @@
 long reads from a set of genome assemblies.
 Written in Rust, `simmr` is designed to be fairly fast and efficient, and comes with a 
 simple set of options for read simulation.
-Although it's primarily intended to generate metagenomic samples (and some of the empirical 
+Although it's primarily intended to generate samples of metagenomic reads (and some of the empirical 
 distributions it uses reflects this), it should work with assemblies from any organism.
 
 ## Usage
@@ -83,11 +83,10 @@ e.g., simulating 200 reads from 4 genomes using the uniform profile would produc
 a read mixture where the abundance of each genome was roughly 25% and therefore 50 
 reads would be simulated per genome.
 
-The `full` abundance profile is similar to `uniform` except that it generates the 
-full amount of `--num-reads` for each genome instead of distributing that number 
-evenly.
+The `exact` abundance profile is generates `--num-reads` for each genome instead of 
+distributing that number evenly like the `uniform` profile does.
 In the example above, replacing `--abundance-profile uniform` with 
-`--abundance-profile full` produces a read mixture with 200 reads per genome.
+`--abundance-profile exact` produces a read mixture with 200 reads per genome.
 
 ### Genome file
 
