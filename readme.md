@@ -217,3 +217,4 @@ OPTIONS:
 - [] Flesh out readme
 - [] Streaming-ish operations (as opposed to holding everything in memory then writing to disk)
 - [] Tweakable long read lengths
+- [] Use annotation information to generate reads from specific regions

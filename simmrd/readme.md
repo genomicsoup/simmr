@@ -16,9 +16,27 @@ $ simmrd --sam-file alignments.sam --output error-model.bin
 
 ## How it works
 
+`simmrd` models two separate distributions: one for per-base quality scores and a second 
+for sequencing errors.
+Quality score and sequencing error data can both be derived from a SAM file containing alignments.
+The latter requires the MD tag to be present.
+
 ### Quality scores
 
+For each alignment in the SAM file, `simmrd` records base pair positions and quality scores at 
+each position.
+These quality scores are then binned at each position to later be used with kernel density 
+estimation (KDE).
+
 ### Sequencing errors
+
+Sequencing errors are modeled using k-mers.
+Pairs of k-mers are enumerated for each alignment: one k-mer represents k bases from the
+reference genome, and the second is a chunk of bases from the aligned read.
+In some cases, the aligned k-kmer won't be a perfect match to the reference--it may 
+contain mismatches or indels.
+`simmrd` records the probability of the reference k-mer being sequenced incorrectly,
+and these probabilities can later be used to simulate errors during read generation.
 
 
 ## Development

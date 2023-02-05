@@ -30,9 +30,6 @@ fn main() {
     // Setup stderr logging
     log::setup_logging();
 
-    // "/Users/tim/code/simmr/align-tests/test-missing-seq.sam"
-    // "/Volumes/minidata/SRR13059359.sam"
-    // "/Users/tim/code/simmr/align-tests/test.sam"
     let mut sam_reader = File::open(&args.sam_file[0])
         .map(BufReader::new)
         .map(sam::Reader::new)

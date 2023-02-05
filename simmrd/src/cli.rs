@@ -5,46 +5,6 @@
 use clap::Parser;
 
 /**
- * HELP DESCRIPTIONS
- */
-
-static ABUNDANCE_HELP: &'static str = "
-Genome abundances for the set of simulated reads.
-
-<full>    generates NUM_READS for each genome
-<uniform> uniformly distributes abundances across each genome
-
-";
-
-static ERROR_HELP: &'static str = "
-Error profile to use for read simulation
-
-<zero>  simulate perfect reads
-<basic> simulate quality scores using a normal distribution and a uniform 
-        substitution rate
-
-";
-
-static GENOME_FILE_HELP: &'static str = "
-File containing input genome filepaths and metadata, one filepath per line
-
-If a TSV file is provided, additional metadata columns can be used for
-read simulation and abundance calculation. <fields> are all optional.
-
-    filepath  <abundance>  <uuid>
-";
-
-static READ_FORMAT_HELP: &'static str = "
-Header format for simulated reads. This string will be attached to all read headers. Supports 
-some string interpolation via usage of the following fields:
-
-    {:genome_id:}  replaced by the genome UUID the simulated read is derived from
-    {:read_id:}    replaced by the unique read ID
-    {:pair:}       if simulating PE reads, replaced by the pair number 1 or 2
-
-";
-
-/**
  * STRUCTS
  */
 
