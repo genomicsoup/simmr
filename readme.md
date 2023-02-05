@@ -58,7 +58,7 @@ Custom error profiles, which model quality score distributions and sequencing er
 generated from real sequencing datasets.
 Two custom error profiles are included with `simmr`.
 The first can be used to simulate metagenomic long reads from an ONT MiniION.
-The second can be used to simulate metagenomic short reads from an Illumina NoveSeq.
+The second can be used to simulate metagenomic short reads from an Illumina NovaSeq.
 See the [`simmrd`](simmrd/) docs for more info on generating your own.
 
 ### Abundance profiles
