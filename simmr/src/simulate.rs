@@ -231,11 +231,11 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
 
     // Generate quality scores for both reads
     let fwd_quality = error_profile.simulate_phred_scores(read_length, seed);
-    let rev_quality = error_profile.simulate_phred_scores(read_length, seed);
+    let rev_quality = error_profile.simulate_phred_scores(read_length, rng.gen());
 
     // Simulate point mutations using this profile's error distribution
     fwd_read = error_profile.simulate_point_mutations(&fwd_read, &fwd_quality, seed);
-    rev_read = error_profile.simulate_point_mutations(&rev_read, &rev_quality, seed);
+    rev_read = error_profile.simulate_point_mutations(&rev_read, &rev_quality, rng.gen());
 
     // Finally, fill out the read struct
     let pe_read = SimulatedRead {
