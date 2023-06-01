@@ -15,6 +15,7 @@ use crate::util;
 pub struct MinimalShortErrorProfile {
     pub read_length: u16,
     pub insert_size: u16,
+    pub mean_phred_score: u8,
 }
 
 impl base::ErrorProfile for MinimalShortErrorProfile {
@@ -44,9 +45,13 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
             None => StdRng::from_entropy(),
         };
 
-        // Assume mean quality score of 30 and std. dev of 0.01
-        //let normal = Normal::new(util::convert_phred_to_probability(30), 0.01).unwrap();
-        let normal = Normal::new(util::convert_phred_to_accuracy(15), 0.01).unwrap();
+        // Assume mean quality score of 30 and std. dev of 10
+        let normal = Normal::new(
+            util::convert_phred_to_probability(self.mean_phred_score),
+            10.0,
+        )
+        .unwrap();
+        //let normal = Normal::new(util::convert_phred_to_accuracy(15), 0.01).unwrap();
 
         (0..seq_length)
             .into_iter()

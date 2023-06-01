@@ -207,6 +207,7 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
         ErrorProfile::MinimalShort => Box::new(error_profiles::MinimalShortErrorProfile {
             read_length: args.read_length,
             insert_size: args.insert_size,
+            mean_phred_score: args.mean_phred_score,
         }),
         ErrorProfile::PerfectLong => Box::new(error_profiles::PerfectLongErrorProfile {}),
         ErrorProfile::MinimalLong => Box::new(error_profiles::MinimalLongErrorProfile {}),
