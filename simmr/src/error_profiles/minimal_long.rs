@@ -14,7 +14,9 @@ use rand_distr::{Gamma, Normal};
 use super::base;
 use crate::util;
 
-pub struct MinimalLongErrorProfile {}
+pub struct MinimalLongErrorProfile {
+    pub mean_phred_score: u8,
+}
 
 impl base::ErrorProfile for MinimalLongErrorProfile {
     /**
@@ -61,7 +63,8 @@ impl base::ErrorProfile for MinimalLongErrorProfile {
 
         // Assume mean accuracy 0.99 (phred score of 20) and a std. dev of 0.01, for long reads
         // which tend have worse quality scores this should probably be lowered
-        let normal = Normal::new(util::convert_phred_to_accuracy(20), 0.05).unwrap();
+        let normal =
+            Normal::new(util::convert_phred_to_accuracy(self.mean_phred_score), 10.0).unwrap();
 
         (0..seq_length)
             .into_iter()

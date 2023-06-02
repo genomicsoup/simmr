@@ -210,7 +210,9 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
             mean_phred_score: args.mean_phred_score,
         }),
         ErrorProfile::PerfectLong => Box::new(error_profiles::PerfectLongErrorProfile {}),
-        ErrorProfile::MinimalLong => Box::new(error_profiles::MinimalLongErrorProfile {}),
+        ErrorProfile::MinimalLong => Box::new(error_profiles::MinimalLongErrorProfile {
+            mean_phred_score: args.mean_phred_score,
+        }),
         _ => todo!(),
     }
 }
