@@ -2,7 +2,14 @@
  * file: alignment.rs
  * desc: Functions related to parsing alignment data and SAM/BAM formats.
  */
+use bincode;
+use hex;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::io::Write;
+use std::path::Path;
 
 use shared::encoding;
 use shared::util;
@@ -19,6 +26,7 @@ use shared::util;
  *  sequence: sequence of the aligned read
  *  md_tag:   encodes (mis)matches and deletions in the reference sequence
  */
+#[derive(Deserialize, Serialize, PartialEq, Debug)]
 pub struct AlignmentRecord {
     pub cigar: Vec<u8>,
     pub sequence: Vec<u8>,
@@ -347,6 +355,75 @@ pub fn encoded_kmerize_alignment(
     }
 
     kmer_map
+}
+
+/**
+ * Uses bincode to serialize a custom model and write it to the given output.
+ */
+//pub fn serialize_alignments_to_path(filepath: &Path, align: &AlignmentRecord) -> Result<(), String> {
+pub fn serialize_alignments_to_path(
+    filepath: &Path,
+    align: Vec<AlignmentRecord>,
+) -> Result<(), String> {
+    // Serialize into a binary format
+    let bytes = bincode::serialize(&align).unwrap();
+
+    // Set up file for writing
+    let mut file = match fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(filepath)
+    {
+        Ok(f) => f,
+        Err(e) => return Err(format!("{}", e)),
+    };
+
+    // Write out the bytes to the file
+    match file.write_all(&bytes) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("{}", e)),
+    }
+}
+
+/**
+ * Deserialize a custom model into the proper struct.
+ */
+pub fn deserialize_alignments_from_path(filepath: &Path) -> Result<Vec<AlignmentRecord>, String> {
+    let bytes = match fs::read(filepath) {
+        Ok(bs) => bs,
+        Err(e) => return Err(format!("{}", e)),
+    };
+
+    // Attempt to deserialize
+    let model: Vec<AlignmentRecord> = match bincode::deserialize(&bytes) {
+        Ok(m) => m,
+        Err(e) => return Err(format!("{}", *e)),
+    };
+
+    Ok(model)
+}
+
+pub fn serialize_to_hex_string<T: Serialize>(t: &T) -> Result<String, String> {
+    let bytes = match bincode::serialize(&t) {
+        Ok(b) => b,
+        Err(e) => return Err(format!("{}", e)),
+    };
+
+    Ok(hex::encode(bytes))
+}
+
+pub fn deserialize_from_hex_string<T: DeserializeOwned>(s: &str) -> Result<T, String> {
+    let bytes = match hex::decode(s) {
+        Ok(b) => b,
+        Err(e) => return Err(format!("{}", e)),
+    };
+
+    let t: T = match bincode::deserialize(&bytes) {
+        Ok(t) => t,
+        Err(e) => return Err(format!("{}", e)),
+    };
+
+    Ok(t)
 }
 
 #[cfg(test)]

@@ -56,6 +56,22 @@ pub struct CliArgs {
         help = "Kmer length, must be between 3 and 10"
     )]
     pub k: usize,
+
+    #[clap(
+        long,
+        value_parser,
+        default_value = "/tmp",
+        help = "Temporary directory for intermediate files"
+    )]
+    pub temp_directory: String,
+
+    #[clap(
+        long,
+        value_parser,
+        default_value_t = false,
+        help = "Do all work in memory, faster but uses more memory"
+    )]
+    pub in_memory: bool,
 }
 
 /**

@@ -216,5 +216,6 @@ OPTIONS:
     - Currently handles D, H, I, M, and S
 - [] Flesh out readme
 - [] Streaming-ish operations (as opposed to holding everything in memory then writing to disk)
+    - [] Improve memory usage
 - [] Tweakable long read lengths
 - [] Use annotation information to generate reads from specific regions

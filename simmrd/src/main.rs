@@ -12,10 +12,11 @@ use noodles::sam::{self, record::cigar};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::fs::File;
 use std::hash::Hash;
 use std::io::Write;
+use std::io::{self, BufRead, BufReader};
 use std::path::Path;
-use std::{fs::File, io::BufReader};
 use tracing::{error, info, warn};
 
 use shared::encoding;
@@ -24,6 +25,74 @@ use shared::util;
 fn convert_expanded_md_tag(md: Vec<(u8, u8)>) -> Vec<(char, char)> {
     md.iter().map(|(t, n)| (*t as char, *n as char)).collect()
 }
+
+fn kmerize_alignments_from_disk(k: usize, alignment_path: &Path) -> alignment::EncodedKmerCountMap {
+    let file = File::open(alignment_path).unwrap();
+    let mut kmer_map: alignment::EncodedKmerCountMap = HashMap::new();
+
+    for (i, line) in io::BufReader::new(file).lines().enumerate() {
+        // Deserialize the alignment record
+        let rec: alignment::AlignmentRecord =
+            alignment::deserialize_from_hex_string(&line.unwrap())
+                .expect("Failed to deserialize alignment record");
+
+        // Reconstruct the query/reference alignment using the expanded CIGAR and MD tag strings
+        let (ref_seq, query_seq) = alignment::reconstruct_alignment(
+            &alignment::expand_cigar(&rec.cigar),
+            &alignment::expand_md_tag(&rec.md_tag),
+            &rec.sequence,
+        );
+
+        // Kmerize the alignment and generate a map of each kmer -> sequenced alternate kmers
+        let kmers = alignment::encoded_kmerize_alignment(k, ref_seq.len(), &ref_seq, &query_seq);
+
+        // We need to consolidate kmers across alignments, so merge all of the hashmaps together
+        kmers.into_iter().for_each(|(k, mut v)| {
+            let kmer_counts = kmer_map.entry(k).or_default();
+
+            for (subkey, c) in v.into_iter() {
+                *kmer_counts.entry(subkey).or_default() += c;
+            }
+        });
+    }
+
+    kmer_map
+}
+
+fn kmerize_alignments(
+    k: usize,
+    alignments: Vec<alignment::AlignmentRecord>,
+) -> alignment::EncodedKmerCountMap {
+    let mut kmer_map: alignment::EncodedKmerCountMap = HashMap::new();
+
+    for (i, rec) in alignments.iter().enumerate() {
+        if (i % 20_000) == 0 && i > 0 {
+            info!("Kmerized {} alignments", i);
+        }
+
+        // Reconstruct the query/reference alignment using the expanded CIGAR and MD tag strings
+        let (ref_seq, query_seq) = alignment::reconstruct_alignment(
+            &alignment::expand_cigar(&rec.cigar),
+            &alignment::expand_md_tag(&rec.md_tag),
+            &rec.sequence,
+        );
+
+        // Kmerize the alignment and generate a map of each kmer -> sequenced alternate kmers
+        let kmers = alignment::encoded_kmerize_alignment(k, ref_seq.len(), &ref_seq, &query_seq);
+
+        // We need to consolidate kmers across alignments, so merge all of the hashmaps together
+        kmers.into_iter().for_each(|(k, mut v)| {
+            let kmer_counts = kmer_map.entry(k).or_default();
+
+            for (subkey, c) in v.into_iter() {
+                *kmer_counts.entry(subkey).or_default() += c;
+            }
+        });
+    }
+
+    kmer_map
+}
+
 fn main() {
     let args = cli::parse_cli_args();
 
@@ -37,11 +106,14 @@ fn main() {
 
     let sam_header = sam_reader.read_header().unwrap().parse().unwrap();
 
+    let temp_alignment_path = Path::new(&args.temp_directory).join("alignments.bin");
+
     info!("Parsing {}", args.sam_file[0]);
 
     let mut alignments = Vec::new();
     // Save per-base quality scores
     let mut qualities: HashMap<u32, Vec<u8>> = HashMap::new();
+    //let
 
     for (i, res) in sam_reader.records(&sam_header).enumerate() {
         let record = res.unwrap();
@@ -51,7 +123,7 @@ fn main() {
             break;
         }
 
-        if (i % 10_000) == 0 && i > 0 {
+        if (i % 250_000) == 0 && i > 0 {
             info!("Processed {} records", i);
         }
 
@@ -112,45 +184,31 @@ fn main() {
         });
     }
 
-    info!("Kmerizing alignments and encoding kmers");
-
-    let mut kmers = Vec::new();
-
-    for (i, rec) in alignments.iter().enumerate() {
-        if (i % 20_000) == 0 && i > 0 {
-            info!("Kmerized {} alignments", i);
-        }
-
-        // Reconstruct the query/reference alignment using the expanded CIGAR and MD tag strings
-        let (ref_seq, query_seq) = alignment::reconstruct_alignment(
-            &alignment::expand_cigar(&rec.cigar),
-            &alignment::expand_md_tag(&rec.md_tag),
-            &rec.sequence,
+    // We're not doing this completely in memory, so store alignments to disk
+    if !args.in_memory {
+        info!(
+            "Writing alignments to temporary location, {}",
+            temp_alignment_path.display()
         );
 
-        // Kmerize the alignment and generate a map of each kmer -> sequenced alternate kmers
-        kmers.push(alignment::encoded_kmerize_alignment(
-            args.k,
-            ref_seq.len(),
-            &ref_seq,
-            &query_seq,
-        ));
+        let mut f = File::create(&temp_alignment_path).unwrap();
+
+        // Write encoded alignments to disk
+        alignments
+            .iter()
+            .map(|a| alignment::serialize_to_hex_string(&a).unwrap())
+            .for_each(|a| writeln!(f, "{}", a).unwrap());
+
+        alignments.clear();
     }
 
-    info!("Consolidating reference and alternate kmers");
+    info!("Kmerizing alignments and encoding kmers");
 
-    let mut kmer_map: alignment::EncodedKmerCountMap = HashMap::new();
-
-    // We need to consolidate kmers across alignments, so merge all of the hashmaps together
-    for km in kmers {
-        km.into_iter().for_each(|(k, mut v)| {
-            let kmer_counts = kmer_map.entry(k).or_default();
-
-            for (subkey, c) in v.into_iter() {
-                *kmer_counts.entry(subkey).or_default() += c;
-            }
-        })
-    }
+    let mut kmer_map = if !args.in_memory {
+        kmerize_alignments_from_disk(args.k, &temp_alignment_path)
+    } else {
+        kmerize_alignments(args.k, alignments)
+    };
 
     info!(
         "Generating kmer probabilities for {} reference kmers",
@@ -189,6 +247,8 @@ fn main() {
             probabilities: kmer_probs,
         },
     );
+
+    info!("Wrote sequence error model to {}", args.output);
 
     if output_result.is_err() {
         error!("Failed to ")
