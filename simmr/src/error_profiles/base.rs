@@ -10,6 +10,8 @@ pub trait ErrorProfile {
     fn get_random_read_length(&self, seed: Option<u64>) -> u16;
     // Returns the length of the simulated insert size
     fn get_insert_size(&self) -> u16;
+    // Returns a random insert size for a simulated read
+    fn get_random_insert_size(&self, seed: Option<u64>) -> u16;
     // Simulate phred scores based on the error model
     fn simulate_phred_scores(&self, seq_length: usize, seed: Option<u64>) -> Vec<u8>;
     // Simulate point mutations in the given sequence using profile-specific distributions
@@ -43,6 +45,10 @@ where
 
     fn get_insert_size(&self) -> u16 {
         (**self).get_insert_size()
+    }
+
+    fn get_random_insert_size(&self, seed: Option<u64>) -> u16 {
+        (**self).get_random_insert_size(seed)
     }
 
     fn simulate_phred_scores(&self, seq_length: usize, seed: Option<u64>) -> Vec<u8> {
