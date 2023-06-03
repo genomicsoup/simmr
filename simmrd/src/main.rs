@@ -113,7 +113,10 @@ fn main() {
     let mut alignments = Vec::new();
     // Save per-base quality scores
     let mut qualities: HashMap<u32, Vec<u8>> = HashMap::new();
-    //let
+    // Save insert sizes for each paired alignment
+    let mut insert_sizes: Vec<f64> = Vec::new();
+    // Save read lengths
+    let mut read_lengths: Vec<f64> = Vec::new();
 
     for (i, res) in sam_reader.records(&sam_header).enumerate() {
         let record = res.unwrap();
@@ -159,6 +162,11 @@ fn main() {
         if seq.len() == 0 {
             continue;
         }
+
+        // It's possible to have negative insert sizes if the first read is mapped
+        // to the reverse strand.
+        insert_sizes.push(record.template_length().abs() as f64);
+        read_lengths.push(seq.len() as f64);
 
         // Regenerate the raw CIGAR string from the alignment record
         let cigar: Vec<u8> = record
@@ -245,6 +253,11 @@ fn main() {
             bit_encoding: 3,
             kmer_size: args.k,
             probabilities: kmer_probs,
+            insert_size_mean: util::mean(&insert_sizes),
+            insert_size_std: util::std_deviation(&insert_sizes),
+            read_length_mean: util::mean(&read_lengths),
+            read_length_std: util::std_deviation(&read_lengths),
+            is_long: util::mean(&read_lengths) > 400.0,
         },
     );
 

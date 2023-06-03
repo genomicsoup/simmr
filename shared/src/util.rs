@@ -2,6 +2,8 @@
  * file: util.rs
  * desc: Misc. utility functions.
  */
+use num_traits::Float;
+use std::iter::Sum;
 
 /**
  * Sequence related functions
@@ -48,6 +50,55 @@ pub fn bytes_to_string(bs: &[u8]) -> String {
     std::str::from_utf8(bs).unwrap_or("").to_string()
 }
 
+/**
+ * maths
+ */
+
+pub fn mean2<T, I: Iterator<Item = T>>(iter: I) -> f64
+where
+    T: Into<f64> + Sum<T>,
+{
+    let mut length = 0;
+    let sum = iter
+        .map(|t| {
+            length += 1;
+            t
+        })
+        .sum::<T>();
+
+    if length == 0 {
+        return 0.0;
+    }
+
+    sum.into() / length as f64
+}
+
+pub fn mean<T>(vs: &[T]) -> T
+where
+    T: Float,
+{
+    //vs.iter().map(|t| *t).sum::<T>() / num_traits::cast(vs.len()).unwrap()
+    vs.iter().fold(T::zero(), |ac: T, v| ac + *v) / num_traits::cast(vs.len()).unwrap()
+}
+
+pub fn variance<T>(vs: &[T]) -> T
+where
+    T: Float,
+{
+    let avg = mean(vs);
+
+    vs.iter()
+        .fold(T::zero(), |ac: T, v| ac + (*v - avg) * (*v - avg))
+        / num_traits::cast(vs.len()).unwrap()
+}
+
+pub fn std_deviation<T>(vs: &[T]) -> T
+where
+    T: Float,
+{
+    variance(vs).sqrt()
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -89,5 +140,15 @@ mod tests {
     #[test]
     fn test_bytes_to_string() {
         assert!(bytes_to_string(&vec![b'f', b'o', b'o']) == "foo".to_string());
+    }
+
+    #[test]
+    fn test_mean_1() {
+        assert!(mean(&vec![1.0, 2.0, 3.0, 4.0, 5.0]) == 3.0);
+    }
+
+    #[test]
+    fn test_std_dev_1() {
+        assert!((std_deviation(&vec![1.0, 2.0, 3.0, 4.0, 5.0]) * 100.0).round() / 100.0 == 1.41);
     }
 }

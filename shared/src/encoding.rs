@@ -89,6 +89,11 @@ pub struct ErrorModelParams {
     pub bit_encoding: u8,
     pub kmer_size: usize,
     pub probabilities: Vec<(u32, Vec<(u32, f32)>)>,
+    pub insert_size_mean: f64,
+    pub insert_size_std: f64,
+    pub read_length_mean: f64,
+    pub read_length_std: f64,
+    pub is_long: bool,
 }
 
 /**

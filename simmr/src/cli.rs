@@ -138,7 +138,7 @@ pub struct CliArgs {
         long,
         default_value_t = 30,
         value_parser,
-        help = "Average Phred quality score to use during read quality simulation [not implemented]"
+        help = "Average Phred quality score to use during read quality simulation"
     )]
     pub mean_phred_score: u8,
 
