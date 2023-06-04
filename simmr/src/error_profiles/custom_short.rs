@@ -32,6 +32,7 @@ pub struct CustomShortErrorProfile {
     pub insert_size_std: f64,
     pub read_length_mean: f64,
     pub read_length_std: f64,
+    pub model_params: encoding::ErrorModelParams,
 }
 
 // TODO: put this elsewhere
@@ -49,14 +50,45 @@ fn gaussian(x: f64, xs: &[f64], bandwidth: f64) -> f64 {
 
 impl base::ErrorProfile for CustomShortErrorProfile {
     /**
-     * These end up just returning the mean values.
+     * Return a random read length based on the distribution of read lengths
+     * specified by the model parameters.
      */
-    fn get_read_length(&self) -> u16 {
-        self.read_length_mean as u16
+    fn get_read_length(&self, seed: Option<u64>) -> u16 {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Sample a new value, truncate the resulting float into a u16
+        rng.sample(
+            &Normal::new(
+                self.model_params.read_length_mean,
+                self.model_params.read_length_std,
+            )
+            .unwrap(),
+        )
+        .floor() as u16
     }
 
-    fn get_insert_size(&self) -> u16 {
-        self.insert_size_mean as u16
+    /**
+     * Return a random insert size based on the distribution of insert sizes
+     * specified by the model parameters.
+     */
+    fn get_insert_size(&self, seed: Option<u64>) -> u16 {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Sample a new value, truncate the resulting float into a u16
+        rng.sample(
+            &Normal::new(
+                self.model_params.insert_size_mean,
+                self.model_parmas.insert_size_std,
+            )
+            .unwrap(),
+        )
+        .floor() as u16
     }
 
     /**
@@ -69,8 +101,14 @@ impl base::ErrorProfile for CustomShortErrorProfile {
         };
 
         // Sample a new value, truncate the resulting float into a u16
-        rng.sample(&Normal::new(self.read_length_mean, self.read_length_std).unwrap())
-            .floor() as u16
+        rng.sample(
+            &Normal::new(
+                self.model_params.read_length_mean,
+                self.model_params.read_length_std,
+            )
+            .unwrap(),
+        )
+        .floor() as u16
     }
 
     /**
@@ -83,8 +121,14 @@ impl base::ErrorProfile for CustomShortErrorProfile {
         };
 
         // Sample a new value, truncate the resulting float into a u16
-        rng.sample(&Normal::new(self.insert_size_mean, self.insert_size_std).unwrap())
-            .floor() as u16
+        rng.sample(
+            &Normal::new(
+                self.model_params.insert_size_mean,
+                self.model_params.insert_size_std,
+            )
+            .unwrap(),
+        )
+        .floor() as u16
     }
 
     /**
@@ -103,10 +147,10 @@ impl base::ErrorProfile for CustomShortErrorProfile {
         // Simulate quality score at each position in the read
         for i in 0..seq_length {
             // Get bins for this position
-            let bins = if i > self.quality_bins.len() {
-                &self.quality_bins[self.quality_bins.len() - 1]
+            let bins = if i > self.model_params.quality_bins.len() {
+                &self.model_params.quality_bins[self.model_params.quality_bins.len() - 1]
             } else {
-                &self.quality_bins[i]
+                &self.model_params.quality_bins[i]
             };
 
             let mut centers = Vec::new();
@@ -118,10 +162,11 @@ impl base::ErrorProfile for CustomShortErrorProfile {
                     // We generate random values within this bin. We could also use bin centers
                     // but I think this generates more realistic scores
                     let val = if bndx == 0 {
-                        rng.gen_range(0..self.bin_size) as u32
+                        rng.gen_range(0..self.model_params.bin_size) as u32
                     } else {
                         rng.gen_range(
-                            ((bndx - 1) * self.bin_size as usize)..(bndx * self.bin_size as usize),
+                            ((bndx - 1) * self.model_params.bin_size as usize)
+                                ..(bndx * self.model_params.bin_size as usize),
                         ) as u32
                     };
                     centers.push(val as f64);
@@ -183,20 +228,21 @@ impl base::ErrorProfile for CustomShortErrorProfile {
         let mut new_sequence = sequence.to_vec();
 
         for i in 0..sequence.len() {
-            if (i + self.kmer_size) > sequence.len() {
+            if (i + self.model_params.kmer_size) > sequence.len() {
                 break;
             }
 
             // Grab the kmer
-            let kmer = &new_sequence[i..i + self.kmer_size];
+            let kmer = &new_sequence[i..i + self.model_params.kmer_size];
             // Encode it. If it can't be encoded b/c of characters other than ACGT, skip it
-            let encoded_kmer = match encoding::three_bit_encode_kmer(kmer, self.kmer_size) {
-                Ok(k) => k,
-                Err(_) => continue,
-            };
+            let encoded_kmer =
+                match encoding::three_bit_encode_kmer(kmer, self.model_params.kmer_size) {
+                    Ok(k) => k,
+                    Err(_) => continue,
+                };
 
             // Find the list of alternate kmers, if this kmer hasn't been observed then move on
-            let alts = match self.kmer_probabilities.get(&encoded_kmer) {
+            let alts = match self.model_params.probabilities.get(&encoded_kmer) {
                 Some(vs) => vs,
                 None => continue,
             };
@@ -209,12 +255,16 @@ impl base::ErrorProfile for CustomShortErrorProfile {
             let alt_encoded_kmer = alts[weighted_dist.sample(&mut rng)].0;
 
             // Decode the kmer into a byte array
-            let alt_kmer =
-                encoding::three_bit_decode_kmer(alt_encoded_kmer, self.kmer_size, true).unwrap();
+            let alt_kmer = encoding::three_bit_decode_kmer(
+                alt_encoded_kmer,
+                self.model_params.kmer_size,
+                true,
+            )
+            .unwrap();
 
             // Replace this kmer with the alt in the sequence. Splice is neat in that if alt_kmer has deletions,
             // it will delete the elements at those indices from new_sequence too.
-            new_sequence.splice(i..i + self.kmer_size, alt_kmer);
+            new_sequence.splice(i..i + self.model_params.kmer_size, alt_kmer);
         }
 
         new_sequence
@@ -233,8 +283,13 @@ impl base::ErrorProfile for CustomShortErrorProfile {
         sequence.to_vec()
     }
 
+    /**
+     * Uses mean read lengths and insert size even though the minimum genome size necessary
+     * could be larger than that due to RNG.
+     */
     fn minimum_genome_size(&self) -> u16 {
-        2 * self.get_read_length() + self.get_insert_size()
+        //2 * self.get_read_length() + self.get_insert_size()
+        2 * self.model_prams.read_length_mean + self.model_params.insert_size_mean
     }
 
     fn is_long_read(&self) -> bool {

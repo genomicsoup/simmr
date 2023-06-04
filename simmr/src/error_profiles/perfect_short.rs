@@ -19,7 +19,7 @@ impl base::ErrorProfile for PerfectShortErrorProfile {
         panic!("simulate_errors() is not usable when simulating perfect short reads");
     }
 
-    fn get_read_length(&self) -> u16 {
+    fn get_read_length(&self, seed: Option<u64>) -> u16 {
         self.read_length
     }
 
@@ -27,7 +27,7 @@ impl base::ErrorProfile for PerfectShortErrorProfile {
         self.read_length
     }
 
-    fn get_insert_size(&self) -> u16 {
+    fn get_insert_size(&self, seed: Option<u64>) -> u16 {
         self.insert_size
     }
 
@@ -54,7 +54,8 @@ impl base::ErrorProfile for PerfectShortErrorProfile {
     }
 
     fn minimum_genome_size(&self) -> u16 {
-        2 * self.get_read_length() + self.get_insert_size()
+        //2 * self.get_read_length() + self.get_insert_size()
+        2 * self.read_length + self.insert_size
     }
 
     fn is_long_read(&self) -> bool {

@@ -5,11 +5,11 @@
 
 pub trait ErrorProfile {
     // Returns the length of the simulated PE read -- this is only used for PE reads
-    fn get_read_length(&self) -> u16;
+    fn get_read_length(&self, seed: Option<u64>) -> u16;
     // Returns a random read length for a simulated read -- this is primarily used for long reads
     fn get_random_read_length(&self, seed: Option<u64>) -> u16;
     // Returns the length of the simulated insert size
-    fn get_insert_size(&self) -> u16;
+    fn get_insert_size(&self, seed: Option<u64>) -> u16;
     // Returns a random insert size for a simulated read
     fn get_random_insert_size(&self, seed: Option<u64>) -> u16;
     // Simulate phred scores based on the error model
@@ -35,16 +35,16 @@ impl<T: ?Sized> ErrorProfile for Box<T>
 where
     T: ErrorProfile,
 {
-    fn get_read_length(&self) -> u16 {
-        (**self).get_read_length()
+    fn get_read_length(&self, seed: Option<u64>) -> u16 {
+        (**self).get_read_length(seed)
     }
 
     fn get_random_read_length(&self, seed: Option<u64>) -> u16 {
         (**self).get_random_read_length(seed)
     }
 
-    fn get_insert_size(&self) -> u16 {
-        (**self).get_insert_size()
+    fn get_insert_size(&self, seed: Option<u64>) -> u16 {
+        (**self).get_insert_size(seed)
     }
 
     fn get_random_insert_size(&self, seed: Option<u64>) -> u16 {

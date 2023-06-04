@@ -48,16 +48,31 @@ impl base::ErrorProfile for CustomLongErrorProfile {
      * Unusable functions. These can't and shouldn't be used for long-read error profiles.
      * Calling these when simulating long reads (which should never happen) will cause a panic.
      */
-    fn get_read_length(&self) -> u16 {
-        panic!("get_read_length() is not usable when simulating long reads");
-    }
-
-    fn get_insert_size(&self) -> u16 {
+    fn get_insert_size(&self, seed: Option<u64>) -> u16 {
         panic!("get_insert_size() is not usable when simulating long reads");
     }
 
     fn get_random_insert_size(&self, seed: Option<u64>) -> u16 {
         panic!("get_random_insert_size() is not usable when simulating minimal long reads");
+    }
+
+    fn get_read_length(&self, seed: Option<u64>) -> u16 {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+        // TODO: make these configurable?
+        let mean: f32 = 20_000.0;
+        let std_dev: f32 = 15_000.0;
+
+        // Convert mean and standard deviation to shape and scale parameters. It's easier to
+        // reason and visualize distributions when talking about mean/stddev. I have no fucking
+        // clue what the shape/scale of a distribution means...
+        let shape = (mean / std_dev).powf(2.0);
+        let scale = std_dev.powf(2.0) / mean;
+
+        // Sample a new value, truncate the resulting float into a u16
+        rng.sample(&Gamma::new(shape, scale).unwrap()).floor() as u16
     }
 
     /**

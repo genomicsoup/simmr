@@ -21,16 +21,16 @@ impl base::ErrorProfile for PerfectLongErrorProfile {
      * Unusable functions. These can't and shouldn't be used for long-read error profiles.
      * Calling these when simulating long reads (which should never happen) will cause a panic.
      */
-    fn get_read_length(&self) -> u16 {
-        panic!("get_read_length() is not usable when simulating minimal long reads");
-    }
-
-    fn get_insert_size(&self) -> u16 {
+    fn get_insert_size(&self, seed: Option<u64>) -> u16 {
         panic!("get_insert_size() is not usable when simulating minimal long reads");
     }
 
     fn get_random_insert_size(&self, seed: Option<u64>) -> u16 {
         panic!("get_random_insert_size() is not usable when simulating minimal long reads");
+    }
+
+    fn get_read_length(&self, seed: Option<u64>) -> u16 {
+        20_000
     }
 
     /**

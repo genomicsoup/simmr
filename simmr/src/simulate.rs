@@ -106,7 +106,7 @@ pub fn simulate_pe_reads<
         abundance_profile.adjust_for_size(
             &genomes,
             &unsized_abundances,
-            error_profile.get_read_length() as usize,
+            error_profile.get_read_length(seed) as usize,
             true,
         )
     } else {
@@ -188,8 +188,8 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
     error_profile: &T,
     seed: Option<u64>,
 ) -> Result<SimulatedRead, String> {
-    let read_length = error_profile.get_read_length() as usize;
-    let insert_size = error_profile.get_insert_size() as usize;
+    let read_length = error_profile.get_read_length(seed) as usize;
+    let insert_size = error_profile.get_insert_size(seed) as usize;
 
     // Genome size must be at min. this length to generate a PE read
     let required_size = 2 * read_length + insert_size;

@@ -30,8 +30,15 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
         panic!("simulate_errors() is not usable when simulating basic short reads");
     }
 
-    fn get_read_length(&self) -> u16 {
-        self.read_length
+    fn get_read_length(&self, seed: Option<u64>) -> u16 {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Sample a new value, truncate the resulting float into a u16
+        rng.sample(&Normal::new(self.read_length as f64, self.read_length_std).unwrap())
+            .floor() as u16
     }
 
     /**
@@ -48,8 +55,15 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
             .floor() as u16
     }
 
-    fn get_insert_size(&self) -> u16 {
-        self.insert_size
+    fn get_insert_size(&self, seed: Option<u64>) -> u16 {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Sample a new value, truncate the resulting float into a u16
+        rng.sample(&Normal::new(self.insert_size as f64, self.insert_size_std).unwrap())
+            .floor() as u16
     }
 
     /**
@@ -127,7 +141,8 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
     }
 
     fn minimum_genome_size(&self) -> u16 {
-        2 * self.get_read_length() + self.get_insert_size()
+        //2 * self.get_read_length() + self.get_insert_size()
+        2 * self.read_length + self.insert_size
     }
 
     fn is_long_read(&self) -> bool {

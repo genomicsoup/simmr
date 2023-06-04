@@ -63,7 +63,8 @@ pub enum ErrorProfile {
     MinimalLong,
     PerfectShort,
     PerfectLong,
-    ONT,
+    CustomShort,
+    //ONT,
 }
 
 /**
@@ -120,9 +121,17 @@ pub struct CliArgs {
         long,
         default_value_t = 150,
         value_parser,
-        help = "Individual read length (nt)"
+        help = "Individual read length (nt), default is 150 for short reads and 20,000 for long reads"
     )]
     pub read_length: u16,
+
+    #[clap(
+        long,
+        default_value_t = 10.0,
+        value_parser,
+        help = "Standard deviation of read lengths, default is 10 for short reads and 5,000 for long reads"
+    )]
+    pub read_length_std: f64,
 
     // Read insert size
     #[clap(
@@ -214,6 +223,17 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
         ErrorProfile::PerfectLong => Box::new(error_profiles::PerfectLongErrorProfile {}),
         ErrorProfile::MinimalLong => Box::new(error_profiles::MinimalLongErrorProfile {
             mean_phred_score: args.mean_phred_score,
+            // Make some adjustments to the default values if we're simulating long reads
+            read_length: if args.read_length < 400 {
+                20_000
+            } else {
+                args.read_length
+            },
+            read_length_std: if args.read_length < 400 {
+                args.read_length_std
+            } else {
+                5_000.0
+            },
         }),
         _ => todo!(),
     }
