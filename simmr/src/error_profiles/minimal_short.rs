@@ -1,7 +1,8 @@
 /**
- * file: basic.rs
- * desc: The basic error profile generates phred scores using a normal distribution and
- *       assumes a uniform probability of point mutations.
+ * file: minimal_short.rs
+ * desc: The minimal error profile generates phred scores using a normal distribution and
+ *       assumes a uniform probability of point mutations. Insert sizes and read lengths are
+ *       also generated using a normal distribution.
  */
 use rand::prelude::SliceRandom;
 use rand::rngs::StdRng;
@@ -16,6 +17,8 @@ pub struct MinimalShortErrorProfile {
     pub read_length: u16,
     pub insert_size: u16,
     pub mean_phred_score: u8,
+    pub insert_size_std: f64,
+    pub read_length_std: f64,
 }
 
 impl base::ErrorProfile for MinimalShortErrorProfile {
@@ -31,12 +34,36 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
         self.read_length
     }
 
+    /**
+     * Generates a random read length using a normal distribution.
+     */
     fn get_random_read_length(&self, seed: Option<u64>) -> u16 {
-        self.read_length
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Sample a new value, truncate the resulting float into a u16
+        rng.sample(&Normal::new(self.read_length as f64, self.read_length_std).unwrap())
+            .floor() as u16
     }
 
     fn get_insert_size(&self) -> u16 {
         self.insert_size
+    }
+
+    /**
+     * Generates a random insert size using a normal distribution.
+     */
+    fn get_random_insert_size(&self, seed: Option<u64>) -> u16 {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Sample a new value, truncate the resulting float into a u16
+        rng.sample(&Normal::new(self.insert_size as f64, self.insert_size_std).unwrap())
+            .floor() as u16
     }
 
     fn simulate_phred_scores(&self, seq_length: usize, seed: Option<u64>) -> Vec<u8> {

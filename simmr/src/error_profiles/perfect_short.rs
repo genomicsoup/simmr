@@ -31,6 +31,14 @@ impl base::ErrorProfile for PerfectShortErrorProfile {
         self.insert_size
     }
 
+    /**
+     * Since this is the perfect error profile, it always returns the insert size and not
+     * a random insert size.
+     */
+    fn get_random_insert_size(&self, seed: Option<u64>) -> u16 {
+        self.insert_size
+    }
+
     fn simulate_phred_scores(&self, seq_length: usize, _seed: Option<u64>) -> Vec<u8> {
         std::iter::repeat(60).take(seq_length).collect()
     }

@@ -29,6 +29,10 @@ impl base::ErrorProfile for PerfectLongErrorProfile {
         panic!("get_insert_size() is not usable when simulating minimal long reads");
     }
 
+    fn get_random_insert_size(&self, seed: Option<u64>) -> u16 {
+        panic!("get_random_insert_size() is not usable when simulating minimal long reads");
+    }
+
     /**
      * Generates a random read length using a gamma distribution with a mean of 20K and
      * standard deviation of 15K.

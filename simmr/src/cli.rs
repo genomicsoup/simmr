@@ -129,7 +129,7 @@ pub struct CliArgs {
         long,
         default_value_t = 150,
         value_parser,
-        help = "Insert size for PE reads (nt) [not implemented]"
+        help = "Insert size for PE reads (nt)"
     )]
     pub insert_size: u16,
 
@@ -208,6 +208,8 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
             read_length: args.read_length,
             insert_size: args.insert_size,
             mean_phred_score: args.mean_phred_score,
+            insert_size_std: 75.0,
+            read_length_std: 15.0,
         }),
         ErrorProfile::PerfectLong => Box::new(error_profiles::PerfectLongErrorProfile {}),
         ErrorProfile::MinimalLong => Box::new(error_profiles::MinimalLongErrorProfile {
