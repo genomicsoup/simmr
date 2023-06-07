@@ -7,7 +7,8 @@ mod probability;
 use bincode;
 use itertools::Itertools;
 use noodles::sam::record::cigar::op::kind::Kind;
-use noodles::sam::record::data::field::Tag;
+//use noodles::sam::record::data::field::Tag;
+use noodles::sam::record::data::field::tag;
 use noodles::sam::{self, record::cigar};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -104,7 +105,8 @@ fn main() {
         .map(sam::Reader::new)
         .unwrap();
 
-    let sam_header = sam_reader.read_header().unwrap().parse().unwrap();
+    //let sam_header = sam_reader.read_header().unwrap().parse().unwrap();
+    let sam_header = sam_reader.read_header().unwrap();
 
     let temp_alignment_path = Path::new(&args.temp_directory).join("alignments.bin");
 
@@ -117,6 +119,14 @@ fn main() {
     let mut insert_sizes: Vec<f64> = Vec::new();
     // Save read lengths
     let mut read_lengths: Vec<f64> = Vec::new();
+    // Inform users of alignments where MAPQ is 0
+    let mut bad_quality_alignments = 0;
+    // Inform users where the mate pair is unmapped
+    let mut unmapped_mate_pairs = 0;
+    // Inform users when the read itself is unmapped
+    let mut unmapped_read = 0;
+    // Inform users when the sequence is missing
+    let mut missing_sequence = 0;
 
     for (i, res) in sam_reader.records(&sam_header).enumerate() {
         let record = res.unwrap();
@@ -140,11 +150,36 @@ fn main() {
 
         // Skip unmapped reads, these are only used for quality distributions
         if record.flags().is_unmapped() {
+            unmapped_read += 1;
+            continue;
+        }
+
+        // Get the read's sequence from the alignment record
+        let seq = record.sequence().to_string().as_bytes().to_vec();
+        let mapq = record.mapping_quality();
+
+        // Also skip alignments with MAPQ == 0
+        if mapq.is_some() && mapq.unwrap().get() == 0 {
+            bad_quality_alignments += 1;
+            continue;
+        }
+
+        // If a sequence isn't provided, skip. Probably an alignment w/ MAPQ == 0
+        if seq.len() == 0 {
+            missing_sequence += 1;
+            continue;
+        }
+
+        // Template length of zero usually indicates that the mate is unmapped, alignments
+        // where the mate is unmapped
+        if record.template_length().abs() == 0 && record.flags().is_mate_unmapped() {
+            unmapped_mate_pairs += 1;
             continue;
         }
 
         // MD tag is required
-        let md_tag = match record.data().get(Tag::MismatchedPositions) {
+        //let md_tag = match record.data().get(Tag::MismatchedPositions) {
+        let md_tag = match record.data().get(&tag::MISMATCHED_POSITIONS) {
             None => {
                 warn!(
                     "Read ({}) alignment is missing the MD tag",
@@ -152,14 +187,26 @@ fn main() {
                 );
                 continue;
             }
-            Some(t) => t.value().as_str().unwrap(),
+            //Some(t) => t.value().as_str().unwrap(),
+            Some(t) => t.as_str().unwrap(),
         };
 
-        // Get the read's sequence from the alignment record
-        let seq = record.sequence().to_string().as_bytes().to_vec();
+        if record.template_length().abs() == 0 && !record.flags().is_mate_unmapped() {
+            println!("{:?}", record.template_length().abs());
+            println!("{:?}", mapq);
+            println!("qc fail {}", record.flags().is_qc_fail());
+            println!("unmapped {}", record.flags().is_unmapped());
+            println!("mate unmapped {}", record.flags().is_mate_unmapped());
+            println!("mate align start {:?}", record.mate_alignment_start());
+            println!("align start {:?}", record.alignment_start());
+            println!("is_secondary {:?}", record.flags().is_secondary());
+            println!("is_segment {:?}", record.flags().is_segmented());
+            std::process::exit(1);
+        }
 
-        // If a sequence isn't provided, skip. Probably an alignment w/ MAPQ == 0
-        if seq.len() == 0 {
+        // There are some (a few thousand during my experimentation) alignments with enourmous
+        // insert sizes, skip these b/c they distort the distribution
+        if record.template_length().abs() > 5000 {
             continue;
         }
 
@@ -191,6 +238,24 @@ fn main() {
             md_tag: md_tag.as_bytes().to_vec(),
         });
     }
+
+    info!("Using {} alignments", alignments.len());
+    info!(
+        "Skipped {} alignments with MAPQ == 0",
+        bad_quality_alignments
+    );
+    info!(
+        "Skipped {} alignments that were missing sequences",
+        missing_sequence
+    );
+    info!(
+        "Skipped {} alignments where the read was unmapped",
+        unmapped_read
+    );
+    info!(
+        "Skipped {} alignments where the mate was unmapped",
+        unmapped_mate_pairs
+    );
 
     // We're not doing this completely in memory, so store alignments to disk
     if !args.in_memory {
@@ -245,11 +310,27 @@ fn main() {
 
     let binned = probability::create_quality_bins(qualities, args.bin_size);
 
+    // write insert sizes to disk
+    let insert_size_path = Path::new("sizes.txt");
+    let mut insert_size_file = File::create(&insert_size_path).unwrap();
+    insert_sizes
+        .iter()
+        .for_each(|s| writeln!(insert_size_file, "{}", s).unwrap());
+
+    info!("Model parameters:");
+    info!("  bin size: {}", args.bin_size);
+    info!("  bit encoding: {}", 3);
+    info!("  kmer size: {}", args.k);
+    info!("  insert size mean: {}", util::mean(&insert_sizes));
+    info!("  insert size std: {}", util::std_deviation(&insert_sizes));
+    info!("  read length mean: {}", util::mean(&read_lengths));
+    info!("  read length std: {}", util::std_deviation(&read_lengths));
+
     let output_result = encoding::serialize_model_to_path(
         Path::new(&args.output),
         &encoding::ErrorModelParams {
             bin_size: args.bin_size,
-            qualities: binned,
+            binned_quality_density: binned,
             bit_encoding: 3,
             kmer_size: args.k,
             probabilities: kmer_probs,
@@ -260,6 +341,11 @@ fn main() {
             is_long: util::mean(&read_lengths) > 400.0,
         },
     );
+
+    // Clean up any temp files
+    if temp_alignment_path.exists() {
+        fs::remove_file(&temp_alignment_path).unwrap();
+    }
 
     info!("Wrote sequence error model to {}", args.output);
 

@@ -192,7 +192,8 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
     let insert_size = error_profile.get_insert_size(seed) as usize;
 
     // Genome size must be at min. this length to generate a PE read
-    let required_size = 2 * read_length + insert_size;
+    //let required_size = 2 * read_length + insert_size;
+    let required_size = error_profile.minimum_genome_size() as usize;
 
     // We should never get this error b/c prior to calling this function we remove sequences
     // that are smaller than needed but this is here just in case

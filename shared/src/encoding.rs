@@ -71,6 +71,23 @@ macro_rules! extract_bits2 {
  */
 
 /**
+ * Models the binning of quality scores for a single position in a read.
+ *
+ * fields
+ *  num_bins:       the number of bins
+ *  bin_width:      width/size of each bin
+ *  binned_density: density of quality scores in each bin
+ *  bin_ranges:     range of quality scores in each bin
+ */
+#[derive(Default, Deserialize, Serialize, PartialEq, Debug)]
+pub struct Bins {
+    pub num_bins: usize,
+    pub bin_width: u8,
+    pub binned_density: Vec<f64>,
+    pub bin_ranges: Vec<(u8, u8)>,
+}
+
+/**
  * A struct with custom error model parameters and distributions. This is serialized using
  * bincode into an output that can be used by simmr to model quality scores and
  * sequencing errors.
@@ -85,7 +102,8 @@ macro_rules! extract_bits2 {
 #[derive(Deserialize, Serialize, PartialEq, Debug)]
 pub struct ErrorModelParams {
     pub bin_size: usize,
-    pub qualities: Vec<Vec<u32>>,
+    //pub qualities: Vec<Vec<u32>>,
+    pub binned_quality_density: Vec<Bins>,
     pub bit_encoding: u8,
     pub kmer_size: usize,
     pub probabilities: Vec<(u32, Vec<(u32, f32)>)>,

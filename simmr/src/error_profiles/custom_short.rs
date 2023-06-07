@@ -19,20 +19,26 @@ use shared::encoding;
 use super::base;
 use crate::util;
 
+pub struct QualityScoreDistribution {
+    pub bandwidth: f64,
+    pub centers: Vec<f64>,
+}
+
 pub struct CustomShortErrorProfile {
     // These are NOT unused by this profile
     //pub read_length: u16,
     //pub insert_size: u16,
-    pub bin_size: u8,
-    pub quality_bins: Vec<Vec<u32>>,
-    pub quality_bins2: Vec<Vec<f32>>,
-    pub kmer_size: usize,
-    pub kmer_probabilities: HashMap<u32, Vec<(u32, f32)>>,
-    pub insert_size_mean: f64,
-    pub insert_size_std: f64,
-    pub read_length_mean: f64,
-    pub read_length_std: f64,
+    //pub bin_size: u8,
+    //pub quality_bins: Vec<Vec<u32>>,
+    //pub quality_bins2: Vec<Vec<f32>>,
+    //pub kmer_size: usize,
+    //pub kmer_probabilities: HashMap<u32, Vec<(u32, f32)>>,
+    //pub insert_size_mean: f64,
+    //pub insert_size_std: f64,
+    //pub read_length_mean: f64,
+    //pub read_length_std: f64,
     pub model_params: encoding::ErrorModelParams,
+    pub quality_score_distributions: Vec<QualityScoreDistribution>,
 }
 
 // TODO: put this elsewhere
@@ -46,6 +52,72 @@ fn gaussian(x: f64, xs: &[f64], bandwidth: f64) -> f64 {
         .sum();
 
     sum / ((2.0 * PI).sqrt() * xs.len() as f64 * bandwidth)
+}
+
+impl CustomShortErrorProfile {
+    pub fn new(model_params: encoding::ErrorModelParams, seed: Option<u64>) -> Self {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Start generating the quality score distributions
+        //let mut scores = Vec::new();
+        let mut distributions = Vec::new();
+
+        println!(
+            "Generating quality score distributions for {} positions",
+            model_params.qualities.len()
+        );
+
+        // Simulate quality score at each position in the read
+        for i in 0..model_params.qualities.len() {
+            let bins = &model_params.qualities[i];
+
+            let mut centers = Vec::new();
+            let mut counts = Vec::new();
+
+            // Since we're not using individual data points, calculate centers for each bin
+            for (bndx, count) in bins.iter().enumerate() {
+                centers.push(if bndx == 0 {
+                    model_params.bin_size as f64 / 2.0
+                } else {
+                    (((bndx - 1) * model_params.bin_size as usize)
+                        + (bndx * model_params.bin_size as usize)) as f64
+                        / 2.0
+                });
+                // We store center * count values, since that's the amount of observations in that bin
+                for _ in 0..*count {
+                    // We generate random values within this bin. We could also use bin centers
+                    // but I think this generates more realistic scores
+                    let val = if bndx == 0 {
+                        rng.gen_range(0..model_params.bin_size) as u32
+                    } else {
+                        rng.gen_range(
+                            ((bndx - 1) * model_params.bin_size as usize)
+                                ..(bndx * model_params.bin_size as usize),
+                        ) as u32
+                    };
+                    // aren't really centers but w/e
+                    counts.push(val as f64);
+                }
+            }
+
+            // Estimate the bandwidth parameter using Silverman's rule of thumb, not the best but it's fast
+            let bandwidth =
+                1.06 * stddev(counts.clone().into_iter()) * (counts.len() as f64).powf(-1.0 / 5.0);
+            //let bandwidth = 1.06
+            //    * stddev(centers.clone().into_iter())
+            //    * (centers.len() as f64).powf(-1.0 / 5.0);
+
+            distributions.push(QualityScoreDistribution { bandwidth, centers });
+        }
+
+        Self {
+            model_params,
+            quality_score_distributions: distributions,
+        }
+    }
 }
 
 impl base::ErrorProfile for CustomShortErrorProfile {
@@ -75,6 +147,8 @@ impl base::ErrorProfile for CustomShortErrorProfile {
      * specified by the model parameters.
      */
     fn get_insert_size(&self, seed: Option<u64>) -> u16 {
+        println!("insert_size_mean: {}", self.model_params.insert_size_mean);
+        println!("insert_size_std: {}", self.model_params.insert_size_std);
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::from_entropy(),
@@ -84,7 +158,7 @@ impl base::ErrorProfile for CustomShortErrorProfile {
         rng.sample(
             &Normal::new(
                 self.model_params.insert_size_mean,
-                self.model_parmas.insert_size_std,
+                self.model_params.insert_size_std,
             )
             .unwrap(),
         )
@@ -141,24 +215,45 @@ impl base::ErrorProfile for CustomShortErrorProfile {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::from_entropy(),
         };
+        println!("Simulating phred scores for read of length {}", seq_length);
+        println!("qualities length: {}", self.model_params.qualities.len());
 
         let mut scores = Vec::new();
 
+        for i in 0..seq_length {
+            let distribution = if i < self.quality_score_distributions.len() {
+                &self.quality_score_distributions[i]
+            } else {
+                &self.quality_score_distributions[self.quality_score_distributions.len() - 1]
+            };
+
+            let qs = distribution.centers.choose(&mut rng).unwrap();
+            let normal = Normal::new(*qs, distribution.bandwidth).unwrap();
+            let sim_qs = normal.sample(&mut rng);
+
+            scores.push(sim_qs.round() as u8);
+        }
+        return scores;
+
         // Simulate quality score at each position in the read
         for i in 0..seq_length {
+            println!("Simulating score for position {}", i);
             // Get bins for this position
-            let bins = if i > self.model_params.quality_bins.len() {
-                &self.model_params.quality_bins[self.model_params.quality_bins.len() - 1]
+            let bins = if i > self.model_params.qualities.len() {
+                &self.model_params.qualities[self.model_params.qualities.len() - 1]
             } else {
-                &self.model_params.quality_bins[i]
+                &self.model_params.qualities[i]
             };
 
             let mut centers = Vec::new();
 
             // Since we're not using individual data points, calculate centers for each bin
             for (bndx, count) in bins.iter().enumerate() {
+                let sub_count = ((*count as f64) * 0.50) as usize;
+                //println!("Bin {} has {} counts", bndx, count);
                 // We store center * count values, since that's the amount of observations in that bin
-                for _ in 0..*count {
+                //for _ in 0..*count {
+                for _ in 0..sub_count {
                     // We generate random values within this bin. We could also use bin centers
                     // but I think this generates more realistic scores
                     let val = if bndx == 0 {
@@ -196,6 +291,7 @@ impl base::ErrorProfile for CustomShortErrorProfile {
             let sim_qs = normal.sample(&mut rng);
 
             scores.push(sim_qs.round() as u8);
+            //println!("scores {:?}", scores);
             continue;
 
             // This is the harder way to sample, I think this can just be replaced by the above
@@ -227,6 +323,19 @@ impl base::ErrorProfile for CustomShortErrorProfile {
         // Make a copy of the sequence which we'll mutate and introduce errors into
         let mut new_sequence = sequence.to_vec();
 
+        // Convert the vector of k-mer probabilities into a hashmap for faster lookups
+        let kmer_probs = self
+            .model_params
+            .probabilities
+            .iter()
+            .map(|(k, p)| (k.clone(), p.clone()))
+            .collect::<HashMap<u32, Vec<(u32, f32)>>>();
+        //let mut kmer_probs = HashMap::new();
+
+        //for (kmer, probs) in self.model_params.probabilities.iter() {
+        //    kmer_probs.insert(kmer.clone(), probs.clone());
+        //}
+
         for i in 0..sequence.len() {
             if (i + self.model_params.kmer_size) > sequence.len() {
                 break;
@@ -242,7 +351,8 @@ impl base::ErrorProfile for CustomShortErrorProfile {
                 };
 
             // Find the list of alternate kmers, if this kmer hasn't been observed then move on
-            let alts = match self.model_params.probabilities.get(&encoded_kmer) {
+            //let alts = match self.model_params.probabilities.get(&encoded_kmer) {
+            let alts = match kmer_probs.get(&encoded_kmer) {
                 Some(vs) => vs,
                 None => continue,
             };
@@ -289,11 +399,11 @@ impl base::ErrorProfile for CustomShortErrorProfile {
      */
     fn minimum_genome_size(&self) -> u16 {
         //2 * self.get_read_length() + self.get_insert_size()
-        2 * self.model_prams.read_length_mean + self.model_params.insert_size_mean
+        (2.0 * self.model_params.read_length_mean + self.model_params.insert_size_mean) as u16
     }
 
     fn is_long_read(&self) -> bool {
-        false
+        self.model_params.is_long
     }
 }
 

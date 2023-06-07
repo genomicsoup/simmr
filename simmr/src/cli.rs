@@ -3,6 +3,8 @@
  * desc: CLI parsing.
  */
 use clap::{ArgEnum, ArgGroup, Parser};
+use shared::encoding;
+use std::path;
 
 use crate::abundance_profiles;
 use crate::error_profiles;
@@ -171,6 +173,13 @@ pub struct CliArgs {
     )]
     pub abundance_profile: AbundanceProfile,
 
+    #[clap(
+        long,
+        value_parser,
+        help = "Filepath to a custom error profile to use for read simulation"
+    )]
+    pub custom_profile: Option<String>,
+
     // With
     #[clap(
         long,
@@ -220,6 +229,48 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
             insert_size_std: 75.0,
             read_length_std: 15.0,
         }),
+        // Attempt to load a custom error profile
+        //ErrorProfile::CustomShort => Box::new(error_profiles::CustomShortErrorProfile {
+        //    model_params: match encoding::deserialize_model_from_path(path::Path::new(
+        //        args.custom_profile.as_ref().unwrap(),
+        //    )) {
+        //        Ok(model) => model,
+        //        Err(e) => {
+        //            eprintln!("Error parsing custom error profile: {}", e);
+        //            std::process::exit(1);
+        //        }
+        //    },
+        //}),
+        ErrorProfile::CustomShort => {
+            let model_params = match encoding::deserialize_model_from_path(path::Path::new(
+                args.custom_profile.as_ref().unwrap(),
+            )) {
+                Ok(model) => model,
+                Err(e) => {
+                    eprintln!("Error parsing custom error profile: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            Box::new(error_profiles::CustomShortErrorProfile::new(
+                model_params,
+                args.seed,
+            ))
+        }
+
+        /*
+            Box::new(error_profiles::CustomShortErrorProfile::new(
+            model_params: match encoding::deserialize_model_from_path(path::Path::new(
+                args.custom_profile.as_ref().unwrap(),
+            )) {
+                Ok(model) => model,
+                Err(e) => {
+                    eprintln!("Error parsing custom error profile: {}", e);
+                    std::process::exit(1);
+                }
+            },
+        )),
+        */
         ErrorProfile::PerfectLong => Box::new(error_profiles::PerfectLongErrorProfile {}),
         ErrorProfile::MinimalLong => Box::new(error_profiles::MinimalLongErrorProfile {
             mean_phred_score: args.mean_phred_score,

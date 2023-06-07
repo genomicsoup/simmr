@@ -4,12 +4,15 @@
  */
 mod base;
 mod custom_long;
+mod custom_short;
 mod minimal_long;
 mod minimal_short;
 mod perfect_long;
 mod perfect_short;
 
 pub use self::base::ErrorProfile;
+pub use self::custom_long::CustomLongErrorProfile;
+pub use self::custom_short::CustomShortErrorProfile;
 pub use self::minimal_long::MinimalLongErrorProfile;
 pub use self::minimal_short::MinimalShortErrorProfile;
 pub use self::perfect_long::PerfectLongErrorProfile;

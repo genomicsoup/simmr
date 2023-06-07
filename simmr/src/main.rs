@@ -23,6 +23,16 @@ fn run_main() {
     // Set up logging
     log::setup_logging();
 
+    // Figure out which error and abundance profiles to use
+    let eprofile = cli::determine_error_profile(&args);
+    let aprofile = cli::determine_abundance_profile(&args);
+
+    // Check to make sure short/long args and custom profiles aren't mixed
+    if args.error_profile == cli::ErrorProfile::CustomShort && eprofile.is_long_read() {
+        error!("You specified a custom short-read error profile but the provided error profile is for long reads");
+        std::process::exit(1);
+    }
+
     info!("Loading genomes");
 
     // Parse genomes from cmd args or the genome file
@@ -87,10 +97,6 @@ fn run_main() {
             .collect()
     };
 
-    // Figure out which error and abundance profiles to use
-    let eprofile = cli::determine_error_profile(&args);
-    let aprofile = cli::determine_abundance_profile(&args);
-
     info!("Ensuring genomes meet minimum sequence length requirements for simulation");
 
     // Exclude any sequences which don't meet the required minimum size for the given error profile
@@ -138,12 +144,12 @@ fn run_main() {
         .iter_mut()
         .for_each(|g| g.num_seqs = g.sequence.len());
 
-    info!("Simulating reads");
-
     // Simulate reads
     let reads = if eprofile.is_long_read() {
+        info!("Simulating long reads");
         simulate::simulate_long_reads(args.num_reads, &genomes, &eprofile, &aprofile, args.seed)
     } else {
+        info!("Simulating short reads");
         simulate::simulate_pe_reads(args.num_reads, &genomes, &eprofile, &aprofile, args.seed)
     };
 
