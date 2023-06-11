@@ -4,60 +4,64 @@ mod log;
 mod probability;
 
 //use bincode::{config, Decode, Encode};
-use bincode;
 use itertools::Itertools;
-use noodles::sam::record::cigar::op::kind::Kind;
-//use noodles::sam::record::data::field::Tag;
+use noodles::sam;
 use noodles::sam::record::data::field::tag;
-use noodles::sam::{self, record::cigar};
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use rayon::prelude::*;
+use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
-use std::hash::Hash;
 use std::io::Write;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use tracing::{error, info, warn};
 
 use shared::encoding;
 use shared::util;
 
-fn convert_expanded_md_tag(md: Vec<(u8, u8)>) -> Vec<(char, char)> {
-    md.iter().map(|(t, n)| (*t as char, *n as char)).collect()
-}
-
 fn kmerize_alignments_from_disk(k: usize, alignment_path: &Path) -> alignment::EncodedKmerCountMap {
     let file = File::open(alignment_path).unwrap();
-    let mut kmer_map: alignment::EncodedKmerCountMap = HashMap::new();
 
-    for (i, line) in io::BufReader::new(file).lines().enumerate() {
-        // Deserialize the alignment record
-        let rec: alignment::AlignmentRecord =
-            alignment::deserialize_from_hex_string(&line.unwrap())
-                .expect("Failed to deserialize alignment record");
+    //let mut kmer_map: alignment::EncodedKmerCountMap = HashMap::new();
+    let mut kmer_map: Arc<Mutex<alignment::EncodedKmerCountMap>> =
+        Arc::new(Mutex::new(HashMap::new()));
 
-        // Reconstruct the query/reference alignment using the expanded CIGAR and MD tag strings
-        let (ref_seq, query_seq) = alignment::reconstruct_alignment(
-            &alignment::expand_cigar(&rec.cigar),
-            &alignment::expand_md_tag(&rec.md_tag),
-            &rec.sequence,
-        );
+    io::BufReader::new(file)
+        .lines()
+        .par_bridge()
+        .for_each(|line| {
+            // Deserialize the alignment record
+            let rec: alignment::AlignmentRecord =
+                alignment::deserialize_from_hex_string(&line.unwrap())
+                    .expect("Failed to deserialize alignment record");
 
-        // Kmerize the alignment and generate a map of each kmer -> sequenced alternate kmers
-        let kmers = alignment::encoded_kmerize_alignment(k, ref_seq.len(), &ref_seq, &query_seq);
+            // Reconstruct the query/reference alignment using the expanded CIGAR and MD tag strings
+            let (ref_seq, query_seq) = alignment::reconstruct_alignment(
+                &alignment::expand_cigar(&rec.cigar),
+                &alignment::expand_md_tag(&rec.md_tag),
+                &rec.sequence,
+            );
 
-        // We need to consolidate kmers across alignments, so merge all of the hashmaps together
-        kmers.into_iter().for_each(|(k, mut v)| {
-            let kmer_counts = kmer_map.entry(k).or_default();
+            // Kmerize the alignment and generate a map of each kmer -> sequenced alternate kmers
+            let kmers =
+                alignment::encoded_kmerize_alignment(k, ref_seq.len(), &ref_seq, &query_seq);
 
-            for (subkey, c) in v.into_iter() {
-                *kmer_counts.entry(subkey).or_default() += c;
-            }
+            // We need to consolidate kmers across alignments, so merge all of the hashmaps together
+            //kmers.into_iter().for_each(|(k, mut v)| {
+            kmers.into_iter().for_each(|(k, v)| {
+                let mut kmer_counts = kmer_map.lock().unwrap();
+                let kmer_counts = kmer_counts.entry(k).or_default();
+
+                for (subkey, c) in v.into_iter() {
+                    *kmer_counts.entry(subkey).or_default() += c;
+                }
+            });
         });
-    }
 
-    kmer_map
+    let final_map = kmer_map.lock().unwrap().clone();
+
+    final_map
 }
 
 fn kmerize_alignments(
@@ -82,7 +86,7 @@ fn kmerize_alignments(
         let kmers = alignment::encoded_kmerize_alignment(k, ref_seq.len(), &ref_seq, &query_seq);
 
         // We need to consolidate kmers across alignments, so merge all of the hashmaps together
-        kmers.into_iter().for_each(|(k, mut v)| {
+        kmers.into_iter().for_each(|(k, v)| {
             let kmer_counts = kmer_map.entry(k).or_default();
 
             for (subkey, c) in v.into_iter() {
@@ -94,18 +98,16 @@ fn kmerize_alignments(
     kmer_map
 }
 
-fn main() {
-    let args = cli::parse_cli_args();
-
-    // Setup stderr logging
-    log::setup_logging();
-
+/*
+ * Generate and store all the distributions and relevant data necessary for read simulation.
+ */
+fn generate_simulation_distributions(args: &cli::CliArgs) {
+    // Load the alignments from disk
     let mut sam_reader = File::open(&args.sam_file[0])
         .map(BufReader::new)
         .map(sam::Reader::new)
         .unwrap();
 
-    //let sam_header = sam_reader.read_header().unwrap().parse().unwrap();
     let sam_header = sam_reader.read_header().unwrap();
 
     let temp_alignment_path = Path::new(&args.temp_directory).join("alignments.bin");
@@ -113,11 +115,11 @@ fn main() {
     info!("Parsing {}", args.sam_file[0]);
 
     let mut alignments = Vec::new();
-    // Save per-base quality scores
+    // Per-base quality scores
     let mut qualities: HashMap<u32, Vec<u8>> = HashMap::new();
-    // Save insert sizes for each paired alignment
+    // Insert sizes for each paired alignment
     let mut insert_sizes: Vec<f64> = Vec::new();
-    // Save read lengths
+    // Read lengths
     let mut read_lengths: Vec<f64> = Vec::new();
     // Inform users of alignments where MAPQ is 0
     let mut bad_quality_alignments = 0;
@@ -136,9 +138,9 @@ fn main() {
             break;
         }
 
-        if (i % 250_000) == 0 && i > 0 {
-            info!("Processed {} records", i);
-        }
+        //if (i % 250_000) == 0 && i > 0 {
+        //    info!("Processed {} records", i);
+        //}
 
         // Record the base call positions and their quality scores
         for (i, score) in record.quality_scores().as_ref().iter().enumerate() {
@@ -148,21 +150,9 @@ fn main() {
                 .push(u8::from(*score));
         }
 
-        // Skip unmapped reads, these are only used for quality distributions
-        if record.flags().is_unmapped() {
-            unmapped_read += 1;
-            continue;
-        }
-
         // Get the read's sequence from the alignment record
         let seq = record.sequence().to_string().as_bytes().to_vec();
         let mapq = record.mapping_quality();
-
-        // Also skip alignments with MAPQ == 0
-        if mapq.is_some() && mapq.unwrap().get() == 0 {
-            bad_quality_alignments += 1;
-            continue;
-        }
 
         // If a sequence isn't provided, skip. Probably an alignment w/ MAPQ == 0
         if seq.len() == 0 {
@@ -170,15 +160,31 @@ fn main() {
             continue;
         }
 
-        // Template length of zero usually indicates that the mate is unmapped, alignments
-        // where the mate is unmapped
-        if record.template_length().abs() == 0 && record.flags().is_mate_unmapped() {
+        // Store the read length
+        read_lengths.push(seq.len() as f64);
+
+        // Skip unmapped reads, these are only used for quality distributions
+        if record.flags().is_unmapped() {
+            unmapped_read += 1;
+            continue;
+        }
+
+        // Also skip alignments with MAPQ == 0
+        if mapq.is_some() && mapq.unwrap().get() == 0 {
+            bad_quality_alignments += 1;
+            continue;
+        }
+
+        // Template length of zero usually indicates that the mate is unmapped
+        if !args.single_reads
+            && record.template_length().abs() == 0
+            && record.flags().is_mate_unmapped()
+        {
             unmapped_mate_pairs += 1;
             continue;
         }
 
         // MD tag is required
-        //let md_tag = match record.data().get(Tag::MismatchedPositions) {
         let md_tag = match record.data().get(&tag::MISMATCHED_POSITIONS) {
             None => {
                 warn!(
@@ -187,33 +193,18 @@ fn main() {
                 );
                 continue;
             }
-            //Some(t) => t.value().as_str().unwrap(),
             Some(t) => t.as_str().unwrap(),
         };
 
-        if record.template_length().abs() == 0 && !record.flags().is_mate_unmapped() {
-            println!("{:?}", record.template_length().abs());
-            println!("{:?}", mapq);
-            println!("qc fail {}", record.flags().is_qc_fail());
-            println!("unmapped {}", record.flags().is_unmapped());
-            println!("mate unmapped {}", record.flags().is_mate_unmapped());
-            println!("mate align start {:?}", record.mate_alignment_start());
-            println!("align start {:?}", record.alignment_start());
-            println!("is_secondary {:?}", record.flags().is_secondary());
-            println!("is_segment {:?}", record.flags().is_segmented());
-            std::process::exit(1);
-        }
-
-        // There are some (a few thousand during my experimentation) alignments with enourmous
+        // There are some (a few thousand during my experimentation) alignments with enormous
         // insert sizes, skip these b/c they distort the distribution
-        if record.template_length().abs() > 5000 {
+        if !args.single_reads && record.template_length().abs() > 5000 {
             continue;
         }
 
         // It's possible to have negative insert sizes if the first read is mapped
         // to the reverse strand.
         insert_sizes.push(record.template_length().abs() as f64);
-        read_lengths.push(seq.len() as f64);
 
         // Regenerate the raw CIGAR string from the alignment record
         let cigar: Vec<u8> = record
@@ -229,7 +220,7 @@ fn main() {
             .collect();
 
         alignments.push(alignment::AlignmentRecord {
-            cigar: cigar,
+            cigar,
             sequence: if record.flags().is_reverse_complemented() {
                 util::reverse_complement(&seq)
             } else {
@@ -277,7 +268,7 @@ fn main() {
 
     info!("Kmerizing alignments and encoding kmers");
 
-    let mut kmer_map = if !args.in_memory {
+    let kmer_map = if !args.in_memory {
         kmerize_alignments_from_disk(args.k, &temp_alignment_path)
     } else {
         kmerize_alignments(args.k, alignments)
@@ -290,7 +281,7 @@ fn main() {
 
     let mut kmer_probs = probability::make_encoded_kmer_probabilities(kmer_map);
 
-    // limit alternate kmers to the N prevalent (highest prob) kmers
+    // limit alternate kmers to the N most prevalent (highest prob) kmers
     kmer_probs = kmer_probs
         .iter()
         .map(|(k, alts)| {
@@ -310,17 +301,17 @@ fn main() {
 
     let binned = probability::create_quality_bins(qualities, args.bin_size);
 
-    // write insert sizes to disk
-    let insert_size_path = Path::new("sizes.txt");
-    let mut insert_size_file = File::create(&insert_size_path).unwrap();
-    insert_sizes
-        .iter()
-        .for_each(|s| writeln!(insert_size_file, "{}", s).unwrap());
+    // Need to sort the lengths prior to figuring out the pdf stuff
+    read_lengths.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+    let read_bins = probability::create_read_length_bins(&read_lengths);
 
     info!("Model parameters:");
-    info!("  bin size: {}", args.bin_size);
-    info!("  bit encoding: {}", 3);
-    info!("  kmer size: {}", args.k);
+    info!("  quality bin size: {}", args.bin_size);
+    info!("  read length bin size: {}", read_bins.bin_width);
+    info!("  read length bins: {}", read_bins.num_bins);
+    info!("  k-mer bit encoding: {}", 3);
+    info!("  k-mer size: {}", args.k);
     info!("  insert size mean: {}", util::mean(&insert_sizes));
     info!("  insert size std: {}", util::std_deviation(&insert_sizes));
     info!("  read length mean: {}", util::mean(&read_lengths));
@@ -338,6 +329,7 @@ fn main() {
             insert_size_std: util::std_deviation(&insert_sizes),
             read_length_mean: util::mean(&read_lengths),
             read_length_std: util::std_deviation(&read_lengths),
+            read_bins,
             is_long: util::mean(&read_lengths) > 400.0,
         },
     );
@@ -352,4 +344,47 @@ fn main() {
     if output_result.is_err() {
         error!("Failed to ")
     }
+}
+
+fn main() {
+    let args = cli::parse_cli_args();
+
+    // Setup stderr logging
+    log::setup_logging();
+
+    // Setup threads
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(args.threads)
+        .build_global()
+        .unwrap();
+
+    generate_simulation_distributions(&args);
+
+    //if args.generate_samples.is_some() {
+    //    let model_params = match encoding::deserialize_model_from_path(path::Path::new(
+    //        args.generate_samples.as_ref().unwrap(),
+    //    )) {
+    //        Ok(model) => model,
+    //        Err(e) => {
+    //            eprintln!("Error parsing custom error profile: {}", e);
+    //            std::process::exit(1);
+    //        }
+    //    };
+    //    let bins = &model_params.binned_quality_density[13191];
+
+    //    let dist = WeightedAliasIndex::new(bins.binned_density.clone()).unwrap();
+    //    let mut rng = StdRng::from_entropy();
+    //    let score_choices = (0..=70).map(|x| x).collect_vec();
+    //    let scores = (0..10_000)
+    //        .map(|_| score_choices[dist.sample(&mut rng)])
+    //        .collect_vec();
+
+    //    let sp = Path::new("rando-scores.txt");
+    //    let mut spfile = File::create(&sp).unwrap();
+
+    //    scores.iter().for_each(|x| {
+    //        writeln!(spfile, "{}", x).unwrap();
+    //    });
+    //    std::process::exit(0);
+    //}
 }

@@ -2,6 +2,8 @@
  * file: alignment.rs
  * desc: Functions for calculating kmer/alignment probabilities and distributions.
  */
+use num_traits::Num;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
@@ -42,23 +44,25 @@ pub fn make_encoded_kmer_probabilities(
     kmer_probs
 }
 
-pub fn interquartile_range(data: &[u8]) -> f32 {
-    //let mut sorted = data.to_vec();
-    //sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+/**
+ * Calculate the IQR for a set of data. The data must be sorted prior to using this function.
+ */
+pub fn interquartile_range<T>(data: &[T]) -> f64
+where
+    T: Num + Copy + Into<f64>,
+{
+    let q1 = data[(data.len() as f64 * 0.25).floor() as usize];
+    let q3 = data[(data.len() as f64 * 0.75).floor() as usize];
 
-    //let q1 = sorted[(data.len() as f32 * 0.25).floor() as usize];
-    //let q3 = sorted[(data.len() as f32 * 0.75).floor() as usize];
-    let q1 = data[(data.len() as f32 * 0.25).floor() as usize];
-    let q3 = data[(data.len() as f32 * 0.75).floor() as usize];
-    println!("q1: {}, q3: {}", q1, q3);
-
-    q3 as f32 - q1 as f32
+    q3.into() - q1.into()
 }
 
-pub fn freedman_diaconis_rule(data: &[u8]) -> usize {
+pub fn freedman_diaconis_rule<T>(data: &[T]) -> usize
+where
+    T: Num + Copy + Into<f64>,
+{
     let iqr = interquartile_range(data);
-    println!("iqr: {}", iqr);
-    let n = data.len() as f32;
+    let n = data.len() as f64;
 
     (2.0 * (iqr / n.powf(1.0 / 3.0))) as usize
 }
@@ -94,15 +98,6 @@ fn calculate_bandwidth(values: &[f64]) -> f64 {
     bandwidth
 }
 
-/*
-pub struct Bins {
-    pub num_bins: usize,
-    pub bin_width: u8,
-    pub binned_density: Vec<f64>,
-    pub bin_ranges: Vec<(u8, u8)>,
-}
-    */
-
 /**
  * For a typical sequencing run, there are GBs worth of quality scores. Typically this too much
  * to save and use quality score density estimation. Instead, we bin the quality scores and save
@@ -135,120 +130,102 @@ pub fn create_quality_bins(quals: HashMap<u32, Vec<u8>>, bin_size: usize) -> Vec
 
     let mut bins =
         Vec::<encoding::Bins>::with_capacity((*quals.keys().max().unwrap() + 1) as usize);
+
     bins.resize_with(
         (*quals.keys().max().unwrap() + 1) as usize,
         Default::default,
     );
-    //bins.resize_with((*quals.keys().max().unwrap() + 1) as usize, vec![]);
-    //let mut bins = Vec::with_capacity((*quals.keys().max().unwrap() + 1) as usize);
+
     // Generate the range of values in each bin
-    let bin_ranges = Vec::<(u8, u8)>::with_capacity(num_bins)
+    let bin_ranges = (0..num_bins)
+        .collect::<Vec<usize>>()
         .iter_mut()
         .enumerate()
         .map(|(i, _)| {
-            let start = (i * bin_size) as u8;
-            let end = (((i + 1) * bin_size) as u8) - 1;
+            let start = (i * bin_size) as u32;
+            let end = (((i + 1) * bin_size) as u32) - 1;
 
             (start, end)
         })
-        .collect::<Vec<(u8, u8)>>();
+        .collect::<Vec<(u32, u32)>>();
 
-    for (ndx, scores) in quals {
+    quals.into_iter().for_each(|(ndx, scores)| {
         let float_scores = scores.iter().map(|v| *v as f64).collect::<Vec<f64>>();
         // Estimate bandwidth
         let bandwidth = calculate_bandwidth(&float_scores);
 
         // Estimate density for each quality score using KDE, assuming a normal dist., and assuming the
         // only quality scores are 0 - 70
-        let pdf = (0..=MAX_PHRED_SCORE)
-            .map(|s| gaussian(s as f64, &float_scores, bandwidth))
+        let density = (0..=MAX_PHRED_SCORE)
+            .collect::<Vec<usize>>()
+            .par_iter()
+            .map(|s| gaussian(*s as f64, &float_scores, bandwidth))
             .collect::<Vec<f64>>();
-        println!("ndx: {}, pdf: {:?}", ndx, pdf);
-        //let pdf = scores
-        //    .iter()
-        //    .map(|s| gaussian(*s as f64, &scores.iter().map(|v| *v as f64).collect::<Vec<f64>>(), bandwidth))
-        //    .collect::<Vec<f64>>();
+
         bins[ndx as usize] = encoding::Bins {
             num_bins,
-            bin_width: bin_size as u8,
-            binned_density: pdf,
+            bin_width: bin_size,
+            binned_density: density,
             bin_ranges: bin_ranges.clone(),
         }
-    }
+    });
 
-    /*
+    bins
+}
+
+/**
+ * For a typical sequencing run, there are GBs worth of quality scores. Typically this too much
+ * to save and use quality score density estimation. Instead, we bin the quality scores and save
+ * the number of elements in each bin, then use those bins/counts for KDE. This function bins
+ * the quality scores and returns those bins/counts.
+ *
+ * args
+ *  quals:    a mapping of position -> quality score list (all qualities observed at that position)
+ *  bin_size: the size of each quality bin
+ *
+ * returns
+ *  a vector of quality bins. Each index in the outer vector is the base pair position, and the
+ *  index of each inner vector is the bin number.
+ */
+pub fn create_read_length_bins(lengths: &[f64]) -> encoding::Bins {
+    let bin_size = match freedman_diaconis_rule(&lengths) {
+        bs if bs > 1 => bs,
+        _ => 10,
+    };
+    let min_length = lengths.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+    let max_length = lengths.iter().fold(f64::MIN, |a, &b| a.max(b));
+    let num_bins = ((max_length - min_length) / bin_size as f64).ceil() as usize;
+
+    let mut bins = Vec::<encoding::Bins>::with_capacity(num_bins as usize);
+    bins.resize_with(num_bins, Default::default);
+
     // Generate the range of values in each bin
-    let bin_ranges = Vec::<(u8, u8)>::with_capacity(num_bins)
+    let bin_ranges = (0..num_bins)
+        .collect::<Vec<usize>>()
         .iter_mut()
         .enumerate()
         .map(|(i, _)| {
-            let start = (i * bin_size) as u8;
-            let end = (((i + 1) * bin_size) as u8) - 1;
+            let start = min_length as u32 + (i * bin_size) as u32;
+            let end = min_length as u32 + (((i + 1) * bin_size) as u32) - 1;
 
             (start, end)
         })
-        .collect::<Vec<(u8, u8)>>();
+        .collect::<Vec<(u32, u32)>>();
 
-    let mut bins = Vec::with_capacity((*quals.keys().max().unwrap() + 1) as usize);
+    // Estimate bandwidth
+    let bandwidth = calculate_bandwidth(&lengths);
 
-    for (ndx, scores) in quals {
-        // Generate the bins for this index. This
-        let mut bin_densities: Vec<u32> = vec![0; num_bins];
+    // Estimate density for each the midpoint of each read length bin using KDE, assuming
+    // a normal dist., etc
+    let densities = bin_ranges
+        .par_iter()
+        .map(|(s, e)| gaussian((s + e) as f64 / 2.0, &lengths, bandwidth))
+        .collect::<Vec<f64>>();
 
-        for s in &scores {
-            let the_bin = (*s as f32 / bin_size as f32).floor() as usize;
-
-            // This only applies to scores higher than our MAX_PHRED_SCORE
-            if the_bin >= num_bins {
-                bin_densities[num_bins - 1] += 1;
-            } else {
-                // We just need to count the number of elements in the bin
-                bin_densities[the_bin] += 1;
-            }
-        }
-
-        println!("ndx: {}", ndx);
-
-        // Create the bin for this position
-        bins[ndx as usize] = encoding::Bins {
-            num_bins,
-            bin_width: bin_size as u8,
-            // Convert into frequencies, then densities
-            binned_density: bin_densities
-                .into_iter()
-                .map(|v| ((v as f64) / scores.len() as f64) / bin_size as f64)
-                .collect(),
-            bin_ranges: bin_ranges.clone(),
-        }
+    encoding::Bins {
+        num_bins,
+        bin_width: bin_size,
+        binned_density: densities,
+        bin_ranges: bin_ranges.clone(),
     }
-    */
-
-    bins
-    /*
-    for (ndx, scores) in quals {
-        // Generate the bins for this index. This
-        let mut bins: Vec<u32> = vec![0; num_bins];
-
-        let mut observations = scores.clone();
-
-        observations.sort();
-
-        // Since all our bins are equal width, this should put the score into the right bin
-        for s in scores {
-            let the_bin = (s as f32 / bin_size as f32).floor() as usize;
-
-            // This only applies to scores higher than our MAX_PHRED_SCORE
-            if the_bin >= num_bins {
-                bins[num_bins - 1] += 1;
-            } else {
-                // We just need to count the number of elements in the bin
-                bins[the_bin] += 1;
-            }
-        }
-
-        qual_bins[ndx as usize] = bins;
-    }
-
-    qual_bins
-    */
 }

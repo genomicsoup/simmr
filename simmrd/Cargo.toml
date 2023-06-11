@@ -16,10 +16,12 @@ noodles = { version = "0.40.0", features = ["bam", "sam"] }
 itertools = "0.10.3"
 #noodles = { git = "https://github.com/genomicsoup/noodles.git", features = ["sam"] }
 #noodles-sam = { git = "https://github.com/genomicsoup/noodles.git", features = ["async"] }
+num-traits = "0.2.15"
 tracing = "0.1.26"
 tracing-subscriber = "0.3"
 rand = "0.8.5"
 rand_distr = "0.4.3"
+rayon = "1.7.0"
 serde = "1.0"
 shared = { path = "../shared" }
 

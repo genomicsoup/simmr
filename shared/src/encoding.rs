@@ -82,9 +82,9 @@ macro_rules! extract_bits2 {
 #[derive(Default, Deserialize, Serialize, PartialEq, Debug)]
 pub struct Bins {
     pub num_bins: usize,
-    pub bin_width: u8,
+    pub bin_width: usize,
     pub binned_density: Vec<f64>,
-    pub bin_ranges: Vec<(u8, u8)>,
+    pub bin_ranges: Vec<(u32, u32)>,
 }
 
 /**
@@ -111,6 +111,7 @@ pub struct ErrorModelParams {
     pub insert_size_std: f64,
     pub read_length_mean: f64,
     pub read_length_std: f64,
+    pub read_bins: Bins,
     pub is_long: bool,
 }
 

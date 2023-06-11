@@ -11,11 +11,18 @@ use clap::Parser;
 #[derive(Debug, Parser)]
 #[clap(version, about, long_about = None)]
 pub struct CliArgs {
-    #[clap(required(true), long, value_parser, help = "SAM file")]
+    #[clap(long, value_parser, help = "SAM file")]
     pub sam_file: Vec<String>,
 
-    #[clap(required(true), long, value_parser, help = "Output file")]
+    #[clap(long, value_parser, help = "Output file")]
     pub output: String,
+
+    #[clap(
+        long,
+        value_parser,
+        help = "Generate random samples from the given distribution [unimplemented]"
+    )]
+    pub generate_samples: Option<String>,
 
     #[clap(
         long,
@@ -60,6 +67,14 @@ pub struct CliArgs {
     #[clap(
         long,
         value_parser,
+        default_value_t = false,
+        help = "Alignment contains single ended or long reads"
+    )]
+    pub single_reads: bool,
+
+    #[clap(
+        long,
+        value_parser,
         default_value = "/tmp",
         help = "Temporary directory for intermediate files"
     )]
@@ -72,6 +87,14 @@ pub struct CliArgs {
         help = "Do all work in memory, faster but uses more memory"
     )]
     pub in_memory: bool,
+
+    #[clap(
+        long,
+        value_parser,
+        default_value_t = 1,
+        help = "Number of threads to use, a value of 0 uses all available threads"
+    )]
+    pub threads: usize,
 }
 
 /**
