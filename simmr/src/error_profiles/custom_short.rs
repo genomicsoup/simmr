@@ -9,7 +9,7 @@ use rand::prelude::SliceRandom;
 use rand::rngs::StdRng;
 use rand::Rng;
 use rand::SeedableRng;
-use rand_distr::{Distribution, Gamma, Normal, WeightedAliasIndex};
+use rand_distr::{Distribution, Gamma, Normal, Uniform, WeightedAliasIndex};
 use stats::stddev;
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -24,6 +24,16 @@ pub struct QualityScoreDistribution {
     pub centers: Vec<f64>,
 }
 
+#[derive(Clone, Debug)]
+pub struct CustomPDF {
+    // PDF density
+    pub density: Vec<WeightedAliasIndex<f64>>,
+    // The bin ranges for the PDF
+    //bin_ranges: Vec<(u32, u32)>,
+    pub per_bin_values: Vec<Vec<Uniform<u32>>>,
+}
+
+#[derive(Clone, Debug)]
 pub struct CustomShortErrorProfile {
     // These are NOT unused by this profile
     //pub read_length: u16,
@@ -38,7 +48,10 @@ pub struct CustomShortErrorProfile {
     //pub read_length_mean: f64,
     //pub read_length_std: f64,
     pub model_params: encoding::ErrorModelParams,
-    pub quality_score_distributions: Vec<QualityScoreDistribution>,
+    //pub quality_score_distributions: Vec<QualityScoreDistribution>,
+    pub quality_score_pdf: CustomPDF,
+    pub read_length_pdf: CustomPDF,
+    pub insert_size_pdf: Option<CustomPDF>,
 }
 
 // TODO: put this elsewhere
@@ -54,8 +67,92 @@ fn gaussian(x: f64, xs: &[f64], bandwidth: f64) -> f64 {
     sum / ((2.0 * PI).sqrt() * xs.len() as f64 * bandwidth)
 }
 
+impl CustomPDF {
+    /**
+     * Construct a custom PDF from a model file. Generates the weight rand distributions
+     * needed to sample from the PDF.
+     */
+    pub fn new(binned_density: &Vec<encoding::Bins>) -> CustomPDF {
+        // Build the PDFs for for each base pair quality score
+        let density: Vec<WeightedAliasIndex<f64>> = binned_density
+            .iter()
+            .map(|bins| {
+                let dist = WeightedAliasIndex::new(bins.binned_density.clone()).unwrap();
+                dist
+            })
+            .collect();
+
+        // Build a set of uniform distributions per bin
+        let per_bin_values: Vec<Vec<Uniform<u32>>> = binned_density
+            .iter()
+            .map(|bins| {
+                bins.bin_ranges
+                    .iter()
+                    .map(|(start, end)| Uniform::new_inclusive(*start, *end))
+                    .collect()
+            })
+            .collect();
+
+        Self {
+            density,
+            per_bin_values,
+        }
+    }
+
+    /**
+     * Sample a new data point from the PDF using the given index.
+     * This is mainly designed for use with a distribution of quality scores, where each
+     * per base quality score has its own PDF and the index corresponds to the bp position.
+     * This will panic if the index is out of bounds.
+     */
+    pub fn sample_with_index(&self, index: usize, seed: Option<u64>) -> u32 {
+        if index >= self.density.len() || index >= self.per_bin_values.len() {
+            panic!("PDF index {} out of bounds", index);
+        }
+
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Get a pdf to sample from
+        let pdf = &self.density[index];
+
+        // Select a bin to sample from
+        let sampled_bins = &self.per_bin_values[index];
+        let sampled_bin = sampled_bins[pdf.sample(&mut rng)];
+
+        // Generate a random data point using this PDF
+        let a = sampled_bin.sample(&mut rng);
+        //println!("Sampled {} from bin {}", a, index);
+        a
+    }
+
+    /**
+     * Sample a new data point from the PDF. Assumes there is only a single PDF in the density
+     * vector. Mainly designed for use with anything that doesn't require multiple PDFs, e.g.,
+     * read lengths and insert sizes.
+     */
+    pub fn sample(&self, seed: Option<u64>) -> u32 {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+
+        // Get a pdf to sample from
+        let pdf = &self.density[0];
+
+        // Select a bin to sample from
+        let sampled_bins = &self.per_bin_values[0];
+        let sampled_bin = sampled_bins[pdf.sample(&mut rng)];
+
+        // Generate a random data point using this PDF
+        sampled_bin.sample(&mut rng)
+    }
+}
+
 impl CustomShortErrorProfile {
-    pub fn new(model_params: encoding::ErrorModelParams, seed: Option<u64>) -> Self {
+    pub fn new(model_params: &encoding::ErrorModelParams, seed: Option<u64>) -> Self {
         let mut rng = match seed {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::from_entropy(),
@@ -63,19 +160,20 @@ impl CustomShortErrorProfile {
 
         // Start generating the quality score distributions
         //let mut scores = Vec::new();
-        let mut distributions = Vec::new();
+        //let mut distributions = Vec::new();
 
-        println!(
-            "Generating quality score distributions for {} positions",
-            model_params.qualities.len()
-        );
+        //println!(
+        //    "Generating quality score distributions for {} positions",
+        //    model_params.binned_quality_density.len()
+        //);
 
+        /*
         // Simulate quality score at each position in the read
-        for i in 0..model_params.qualities.len() {
-            let bins = &model_params.qualities[i];
+        for i in 0..model_params.binned_quality_density.len() {
+            let bins = &model_params.binned_quality_density[i];
 
-            let mut centers = Vec::new();
-            let mut counts = Vec::new();
+            //let mut centers = Vec::new();
+            //let mut counts = Vec::new();
 
             // Since we're not using individual data points, calculate centers for each bin
             for (bndx, count) in bins.iter().enumerate() {
@@ -112,10 +210,21 @@ impl CustomShortErrorProfile {
 
             distributions.push(QualityScoreDistribution { bandwidth, centers });
         }
+            */
 
         Self {
-            model_params,
-            quality_score_distributions: distributions,
+            model_params: model_params.clone(),
+            quality_score_pdf: CustomPDF::new(&model_params.binned_quality_density),
+            read_length_pdf: CustomPDF::new(&vec![model_params.read_length_bins.clone()]),
+            insert_size_pdf: if model_params.insert_size_bins.is_some() {
+                Some(CustomPDF::new(&vec![model_params
+                    .insert_size_bins
+                    .as_ref()
+                    .unwrap()
+                    .clone()]))
+            } else {
+                None
+            },
         }
     }
 }
@@ -126,20 +235,22 @@ impl base::ErrorProfile for CustomShortErrorProfile {
      * specified by the model parameters.
      */
     fn get_read_length(&self, seed: Option<u64>) -> u16 {
-        let mut rng = match seed {
-            Some(s) => StdRng::seed_from_u64(s),
-            None => StdRng::from_entropy(),
-        };
+        //let mut rng = match seed {
+        //    Some(s) => StdRng::seed_from_u64(s),
+        //    None => StdRng::from_entropy(),
+        //};
+
+        self.read_length_pdf.sample(seed) as u16
 
         // Sample a new value, truncate the resulting float into a u16
-        rng.sample(
-            &Normal::new(
-                self.model_params.read_length_mean,
-                self.model_params.read_length_std,
-            )
-            .unwrap(),
-        )
-        .floor() as u16
+        //rng.sample(
+        //    &Normal::new(
+        //        self.model_params.read_length_mean,
+        //        self.model_params.read_length_std,
+        //    )
+        //    .unwrap(),
+        //)
+        //.floor() as u16
     }
 
     /**
@@ -147,22 +258,26 @@ impl base::ErrorProfile for CustomShortErrorProfile {
      * specified by the model parameters.
      */
     fn get_insert_size(&self, seed: Option<u64>) -> u16 {
-        println!("insert_size_mean: {}", self.model_params.insert_size_mean);
-        println!("insert_size_std: {}", self.model_params.insert_size_std);
-        let mut rng = match seed {
-            Some(s) => StdRng::seed_from_u64(s),
-            None => StdRng::from_entropy(),
-        };
+        //let mut rng = match seed {
+        //    Some(s) => StdRng::seed_from_u64(s),
+        //    None => StdRng::from_entropy(),
+        //};
+
+        if self.insert_size_pdf.is_none() {
+            0
+        } else {
+            self.insert_size_pdf.as_ref().unwrap().sample(seed) as u16
+        }
 
         // Sample a new value, truncate the resulting float into a u16
-        rng.sample(
-            &Normal::new(
-                self.model_params.insert_size_mean,
-                self.model_params.insert_size_std,
-            )
-            .unwrap(),
-        )
-        .floor() as u16
+        //rng.sample(
+        //    &Normal::new(
+        //        self.model_params.insert_size_mean,
+        //        self.model_params.insert_size_std,
+        //    )
+        //    .unwrap(),
+        //)
+        //.floor() as u16
     }
 
     /**
@@ -215,11 +330,28 @@ impl base::ErrorProfile for CustomShortErrorProfile {
             Some(s) => StdRng::seed_from_u64(s),
             None => StdRng::from_entropy(),
         };
-        println!("Simulating phred scores for read of length {}", seq_length);
-        println!("qualities length: {}", self.model_params.qualities.len());
+        //println!("Simulating phred scores for read of length {}", seq_length);
+        //println!("qualities length: {}", self.model_params.qualities.len());
 
         let mut scores = Vec::new();
 
+        // Generate a random quality score for each position in the read
+        for i in 0..seq_length {
+            // If we don't have any PDFs for this position, just use the last position PDF
+            let seq_pos = if i >= self.quality_score_pdf.density.len() {
+                self.quality_score_pdf.density.len() - 1
+            } else {
+                i
+            };
+
+            // Sample a random quality score from the PDF, truncates to a u8 but this should be
+            // fine
+            scores.push(self.quality_score_pdf.sample_with_index(seq_pos, seed) as u8);
+        }
+
+        return scores;
+
+        /*
         for i in 0..seq_length {
             let distribution = if i < self.quality_score_distributions.len() {
                 &self.quality_score_distributions[i]
@@ -233,8 +365,10 @@ impl base::ErrorProfile for CustomShortErrorProfile {
 
             scores.push(sim_qs.round() as u8);
         }
-        return scores;
+        */
+        //return scores;
 
+        /*
         // Simulate quality score at each position in the read
         for i in 0..seq_length {
             println!("Simulating score for position {}", i);
@@ -305,6 +439,7 @@ impl base::ErrorProfile for CustomShortErrorProfile {
                 }
             }
         }
+        */
 
         scores
     }

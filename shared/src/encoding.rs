@@ -79,7 +79,7 @@ macro_rules! extract_bits2 {
  *  binned_density: density of quality scores in each bin
  *  bin_ranges:     range of quality scores in each bin
  */
-#[derive(Default, Deserialize, Serialize, PartialEq, Debug)]
+#[derive(Clone, Default, Deserialize, Serialize, PartialEq, Debug)]
 pub struct Bins {
     pub num_bins: usize,
     pub bin_width: usize,
@@ -99,7 +99,7 @@ pub struct Bins {
  *  kmer_size:     kmer length
  *  probabilities: a map of reference kmers to alternately sequenced kmers and their probabilities
  */
-#[derive(Deserialize, Serialize, PartialEq, Debug)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 pub struct ErrorModelParams {
     pub bin_size: usize,
     //pub qualities: Vec<Vec<u32>>,
@@ -109,9 +109,10 @@ pub struct ErrorModelParams {
     pub probabilities: Vec<(u32, Vec<(u32, f32)>)>,
     pub insert_size_mean: f64,
     pub insert_size_std: f64,
+    pub insert_size_bins: Option<Bins>,
     pub read_length_mean: f64,
     pub read_length_std: f64,
-    pub read_bins: Bins,
+    pub read_length_bins: Bins,
     pub is_long: bool,
 }
 

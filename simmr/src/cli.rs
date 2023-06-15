@@ -253,7 +253,7 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
             };
 
             Box::new(error_profiles::CustomShortErrorProfile::new(
-                model_params,
+                &model_params,
                 args.seed,
             ))
         }

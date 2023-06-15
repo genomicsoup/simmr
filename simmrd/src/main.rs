@@ -297,19 +297,30 @@ fn generate_simulation_distributions(args: &cli::CliArgs) {
         })
         .collect::<Vec<(u32, Vec<(u32, f32)>)>>();
 
-    info!("Binning quality scores");
+    info!("Generating quality score PDFs");
 
     let binned = probability::create_quality_bins(qualities, args.bin_size);
+
+    info!("Generating read length and insert size PDFs");
+
+    // Attempt to deterimn if these are long or short reads
+    let is_long = util::mean(&read_lengths) > 400.0;
 
     // Need to sort the lengths prior to figuring out the pdf stuff
     read_lengths.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    let read_bins = probability::create_read_length_bins(&read_lengths);
+    let read_length_bins = probability::create_read_length_bins(&read_lengths);
+    let insert_size_bins = if insert_sizes.is_empty() || is_long {
+        None
+    } else {
+        Some(probability::create_insert_size_bins(&insert_sizes))
+    };
 
     info!("Model parameters:");
+    info!("  read type: {}", if is_long { "long" } else { "short" });
     info!("  quality bin size: {}", args.bin_size);
-    info!("  read length bin size: {}", read_bins.bin_width);
-    info!("  read length bins: {}", read_bins.num_bins);
+    info!("  read length bin size: {}", read_length_bins.bin_width);
+    info!("  read length bins: {}", read_length_bins.num_bins);
     info!("  k-mer bit encoding: {}", 3);
     info!("  k-mer size: {}", args.k);
     info!("  insert size mean: {}", util::mean(&insert_sizes));
@@ -327,10 +338,11 @@ fn generate_simulation_distributions(args: &cli::CliArgs) {
             probabilities: kmer_probs,
             insert_size_mean: util::mean(&insert_sizes),
             insert_size_std: util::std_deviation(&insert_sizes),
+            insert_size_bins,
             read_length_mean: util::mean(&read_lengths),
             read_length_std: util::std_deviation(&read_lengths),
-            read_bins,
-            is_long: util::mean(&read_lengths) > 400.0,
+            read_length_bins,
+            is_long,
         },
     );
 

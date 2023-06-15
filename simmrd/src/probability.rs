@@ -136,18 +136,21 @@ pub fn create_quality_bins(quals: HashMap<u32, Vec<u8>>, bin_size: usize) -> Vec
         Default::default,
     );
 
-    // Generate the range of values in each bin
+    // Generate the range of values in each bin, for quality scores we just make one bin per score
     let bin_ranges = (0..num_bins)
         .collect::<Vec<usize>>()
         .iter_mut()
         .enumerate()
         .map(|(i, _)| {
-            let start = (i * bin_size) as u32;
-            let end = (((i + 1) * bin_size) as u32) - 1;
+            //let start = (i * bin_size) as u32;
+            //let end = (((i + 1) * bin_size) as u32) - 1;
 
-            (start, end)
+            //(start, end)
+            (i as u32, i as u32)
         })
         .collect::<Vec<(u32, u32)>>();
+    //println!("{:?}", bin_ranges.len());
+    //println!("bin ranges: {:?}", bin_ranges);
 
     quals.into_iter().for_each(|(ndx, scores)| {
         let float_scores = scores.iter().map(|v| *v as f64).collect::<Vec<f64>>();
@@ -208,9 +211,20 @@ pub fn create_read_length_bins(lengths: &[f64]) -> encoding::Bins {
             let start = min_length as u32 + (i * bin_size) as u32;
             let end = min_length as u32 + (((i + 1) * bin_size) as u32) - 1;
 
-            (start, end)
+            (
+                start,
+                if end > max_length as u32 {
+                    max_length as u32
+                } else {
+                    end
+                },
+            )
         })
         .collect::<Vec<(u32, u32)>>();
+    //println!("min length: {}", min_length);
+    //println!("max length: {}", max_length);
+    //println!("bin range length: {:?}", bin_ranges.len());
+    //println!("bin ranges: {:?}", bin_ranges);
 
     // Estimate bandwidth
     let bandwidth = calculate_bandwidth(&lengths);
@@ -220,6 +234,61 @@ pub fn create_read_length_bins(lengths: &[f64]) -> encoding::Bins {
     let densities = bin_ranges
         .par_iter()
         .map(|(s, e)| gaussian((s + e) as f64 / 2.0, &lengths, bandwidth))
+        .collect::<Vec<f64>>();
+
+    encoding::Bins {
+        num_bins,
+        bin_width: bin_size,
+        binned_density: densities,
+        bin_ranges: bin_ranges.clone(),
+    }
+}
+
+/**
+ * Use KDE to estimate a probability density function for insert sizes.
+ * Generates a vector of densities for bins of insert sizes.
+ *
+ * args
+ *  quals:    a mapping of position -> quality score list (all qualities observed at that position)
+ *  bin_size: the size of each quality bin
+ *
+ * returns
+ *  a vector of quality bins. Each index in the outer vector is the base pair position, and the
+ *  index of each inner vector is the bin number.
+ */
+pub fn create_insert_size_bins(sizes: &[f64]) -> encoding::Bins {
+    let bin_size = match freedman_diaconis_rule(&sizes) {
+        bs if bs > 1 => bs,
+        _ => 10,
+    };
+    let min_length = sizes.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+    let max_length = sizes.iter().fold(f64::MIN, |a, &b| a.max(b));
+    let num_bins = ((max_length - min_length) / bin_size as f64).ceil() as usize;
+
+    let mut bins = Vec::<encoding::Bins>::with_capacity(num_bins as usize);
+    bins.resize_with(num_bins, Default::default);
+
+    // Generate the range of values in each bin
+    let bin_ranges = (0..num_bins)
+        .collect::<Vec<usize>>()
+        .iter_mut()
+        .enumerate()
+        .map(|(i, _)| {
+            let start = min_length as u32 + (i * bin_size) as u32;
+            let end = min_length as u32 + (((i + 1) * bin_size) as u32) - 1;
+
+            (start, end)
+        })
+        .collect::<Vec<(u32, u32)>>();
+
+    // Estimate bandwidth
+    let bandwidth = calculate_bandwidth(&sizes);
+
+    // Estimate density for each the midpoint of each read length bin using KDE, assuming
+    // a normal dist., etc
+    let densities = bin_ranges
+        .par_iter()
+        .map(|(s, e)| gaussian((s + e) as f64 / 2.0, &sizes, bandwidth))
         .collect::<Vec<f64>>();
 
     encoding::Bins {
