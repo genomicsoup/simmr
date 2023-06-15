@@ -356,6 +356,13 @@ fn generate_simulation_distributions(args: &cli::CliArgs) {
     if output_result.is_err() {
         error!("Failed to ")
     }
+
+    if args.save_intermediates.is_some() {
+        info!(
+            "Saving intermediate samplings to files with prefix {}",
+            args.save_intermediates.as_ref().unwrap()
+        );
+    }
 }
 
 fn main() {

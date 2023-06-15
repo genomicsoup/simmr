@@ -11,8 +11,8 @@ fn test_zero_profile() {
         insert_size: 150,
     };
 
-    assert!(zp.get_read_length() == 150);
-    assert!(zp.get_insert_size() == 150);
+    assert!(zp.get_read_length(None) == 150);
+    assert!(zp.get_insert_size(None) == 150);
 
     let quality = zp.simulate_phred_scores(150, None);
 

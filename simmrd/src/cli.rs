@@ -95,6 +95,13 @@ pub struct CliArgs {
         help = "Number of threads to use, a value of 0 uses all available threads"
     )]
     pub threads: usize,
+
+    #[clap(
+        long,
+        value_parser,
+        help = "Save sampled quality scores, read lengths, and insert sizes to files"
+    )]
+    pub save_intermediates: Option<String>,
 }
 
 /**
