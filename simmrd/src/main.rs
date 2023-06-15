@@ -359,9 +359,27 @@ fn generate_simulation_distributions(args: &cli::CliArgs) {
 
     if args.save_intermediates.is_some() {
         info!(
-            "Saving intermediate samplings to files with prefix {}",
+            "Saving intermediate samplings to files with prefix \"{}.\"",
             args.save_intermediates.as_ref().unwrap()
         );
+
+        let read_path = format!(
+            "{}.readlengths.txt",
+            args.save_intermediates.as_ref().unwrap()
+        );
+        let insert_path = format!(
+            "{}.insertsizes.txt",
+            args.save_intermediates.as_ref().unwrap()
+        );
+        let quality_path = format!(
+            "{}.qualities.txt",
+            args.save_intermediates.as_ref().unwrap()
+        );
+
+        for (path, data) in vec![(read_path, read_lengths), (insert_path, insert_sizes)] {
+            let mut f = File::create(path).unwrap();
+            data.iter().for_each(|d| writeln!(f, "{}", d).unwrap());
+        }
     }
 }
 
