@@ -112,7 +112,7 @@ fn calculate_bandwidth(values: &[f64]) -> f64 {
  *  a vector of quality bins. Each index in the outer vector is the base pair position, and the
  *  index of each inner vector is the bin number.
  */
-pub fn create_quality_bins(quals: HashMap<u32, Vec<u8>>, bin_size: usize) -> Vec<encoding::Bins> {
+pub fn create_quality_bins(quals: &HashMap<u32, Vec<u8>>, bin_size: usize) -> Vec<encoding::Bins> {
     // Assuming the max quality score possible is 70, bins are based around that. In reality, the
     // score could be higher (i've seen as high as 90). For those scores, we just lump them into
     // the final bin.
@@ -165,7 +165,7 @@ pub fn create_quality_bins(quals: HashMap<u32, Vec<u8>>, bin_size: usize) -> Vec
             .map(|s| gaussian(*s as f64, &float_scores, bandwidth))
             .collect::<Vec<f64>>();
 
-        bins[ndx as usize] = encoding::Bins {
+        bins[*ndx as usize] = encoding::Bins {
             num_bins,
             bin_width: bin_size,
             binned_density: density,
