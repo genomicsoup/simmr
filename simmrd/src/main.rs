@@ -18,6 +18,11 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tracing::{error, info, warn};
 
+use rand::rngs::StdRng;
+use rand::Rng;
+use rand::SeedableRng;
+use rand_distr::{Distribution, Gamma, Normal, Uniform, WeightedAliasIndex};
+
 use shared::encoding;
 use shared::util;
 
@@ -102,7 +107,8 @@ fn kmerize_alignments(
 /*
  * Generate and store all the distributions and relevant data necessary for read simulation.
  */
-fn generate_simulation_distributions(args: &cli::CliArgs) {
+//fn generate_simulation_distributions(args: &cli::CliArgs) {
+fn generate_simulation_distributions(args: &cli::GenerateCommand) {
     // Keep track of reads we've already encountered, this is used to avoid counting unmapped
     // reads multiple times
     let mut seen_reads: HashSet<String> = HashSet::new();
@@ -345,8 +351,22 @@ fn generate_simulation_distributions(args: &cli::CliArgs) {
     info!("  k-mer bit encoding: {}", 3);
     info!("  k-mer size: {}", args.k);
     info!("  quality bin size: {}", args.bin_size);
-    info!("  insert size bin size: {}", insert_size_bins.bin_width);
-    info!("  insert size bins: {}", insert_size_bins.num_bins);
+    info!(
+        "  insert size bin size: {}",
+        if insert_size_bins.is_some() {
+            insert_size_bins.clone().unwrap().bin_width
+        } else {
+            0
+        }
+    );
+    info!(
+        "  insert size bins: {}",
+        if insert_size_bins.is_some() {
+            insert_size_bins.clone().unwrap().num_bins
+        } else {
+            0
+        }
+    );
     info!("  insert size mean: {}", util::mean(&insert_sizes));
     info!("  insert size std: {}", util::std_deviation(&insert_sizes));
     info!("  read length bin size: {}", read_length_bins.bin_width);
@@ -416,19 +436,70 @@ fn generate_simulation_distributions(args: &cli::CliArgs) {
     }
 }
 
+fn simulate_data(args: &cli::SimulateCommand) {
+    let model_params = match encoding::deserialize_model_from_path(Path::new(&args.distribution)) {
+        Ok(model) => model,
+        Err(e) => {
+            eprintln!("Error parsing custom error profile: {}", e);
+            std::process::exit(1);
+        }
+    };
+    let bins = &model_params.insert_size_bins.unwrap();
+    let dist = WeightedAliasIndex::new(bins.binned_density.clone()).unwrap();
+    //let bin = bins[dist.sample(&mut rand::thread_rng())];
+    //let mut rng = match seed {
+    //    Some(s) => StdRng::seed_from_u64(s),
+    //    None => StdRng::from_entropy(),
+    //};
+    let mut rng = StdRng::from_entropy();
+    let values = (0..20000)
+        .map(|_| {
+            let b = bins.bin_ranges[dist.sample(&mut rng)];
+            //println!("Chose bin: {:?}", b);
+            rng.gen_range(b.0..b.1)
+        })
+        .collect_vec();
+
+    let shit = args.insert_size.clone().unwrap();
+    let sp = Path::new(&shit);
+    let mut spfile = File::create(&sp).unwrap();
+
+    values.iter().for_each(|x| {
+        writeln!(spfile, "{}", x).unwrap();
+    });
+    //println!("{:?}", bins);
+    std::process::exit(0);
+}
+
 fn main() {
     let args = cli::parse_cli_args();
 
     // Setup stderr logging
     log::setup_logging();
 
+    //if args.view.is_some() {
+    //    match encoding::deserialize_model_from_path(Path::new(args.view.as_ref().unwrap())) {
+    //        Ok(model) => println!("{}", model),
+    //        Err(e) => println!("Could not parse model: {}", e),
+    //    };
+    //    std::process::exit(0);
+    //}
+
     // Setup threads
     rayon::ThreadPoolBuilder::new()
-        .num_threads(args.threads)
+        //.num_threads(args.threads)
         .build_global()
         .unwrap();
 
-    generate_simulation_distributions(&args);
+    match args.command {
+        cli::Command::Generate(c) => generate_simulation_distributions(&c),
+        cli::Command::Simulate(c) => simulate_data(&c),
+        _ => {
+            eprintln!("Invalid command");
+            std::process::exit(1);
+        }
+    }
+    //generate_simulation_distributions(&args);
 
     //if args.generate_samples.is_some() {
     //    let model_params = match encoding::deserialize_model_from_path(path::Path::new(

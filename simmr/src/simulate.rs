@@ -8,6 +8,9 @@ use rand::SeedableRng;
 use std::path;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use std::fs::OpenOptions;
+use std::io::prelude::*;
+
 use crate::abundance_profiles;
 use crate::error_profiles;
 use crate::genome;
@@ -46,6 +49,19 @@ pub struct LongRead {
 }
 
 /**
+ * Captures metadata for a simulated read. The metadata tracks the provenance of the read, i.e.
+ * which genome it came from, position, etc.
+ */
+#[derive(Debug)]
+pub struct ReadMetadata {
+    //pub genome_id: Vec<u8>,
+    pub sequence_id: Vec<u8>,
+    pub start_pos: usize,
+    pub end_pos: usize,
+    pub is_reverse_complement: bool,
+}
+
+/**
  Can model a single PE read or a single long read. In the case of the PE read, forward and reverse will both
  be set. For long reads, only the forward read is be used.
 */
@@ -54,6 +70,8 @@ pub struct SimulatedRead {
     pub id: u32,
     pub forward: SingleRead,
     pub reverse: Option<SingleRead>,
+    pub forward_metadata: ReadMetadata,
+    pub reverse_metadata: Option<ReadMetadata>,
 }
 
 /**
@@ -212,19 +230,27 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
     // Forward read starts and ends
     let fwd_start: usize = rng.gen_range(0..(sequence.size - required_size));
     let fwd_end = fwd_start + read_length;
+    //println!("usable size: {}", sequence.size - required_size);
+    //println!("fwd_start: {}", fwd_start);
+    //println!("insert_size: {}", insert_size);
 
     // If these are out of bounds (first is reverse read end and second is it's start position),
     // regenerate the start and end positions for the reverse read
-    let (rev_end, rev_start) = if (fwd_end + insert_size) >= sequence.size
-        || (fwd_end + insert_size + read_length) >= sequence.size
+    let (rev_end, rev_start) = if (fwd_start + insert_size) >= sequence.size
+        || (fwd_start + insert_size + read_length) >= sequence.size
     {
         // TODO: This has the side effect of not respecting the insert size, fix this at some point
         let new_rev_end = rng.gen_range(fwd_start..(sequence.size - required_size));
 
         (new_rev_end, new_rev_end + read_length)
     } else {
-        (fwd_end + insert_size, fwd_end + insert_size + read_length)
+        //(fwd_end + insert_size, fwd_end + insert_size + read_length)
+        (
+            fwd_start + insert_size - read_length,
+            fwd_start + insert_size,
+        )
     };
+    //println!("rev_end: {}", rev_end);
 
     // Generate the sequences from the genome
     let mut fwd_read = sequence.seq[fwd_start..fwd_end].to_owned();
@@ -250,7 +276,20 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
             // from 3' -> 5'
             // TODO: move this up before mutation occurs?
             sequence: util::reverse_complement(&rev_read),
+            //sequence: rev_read,
             quality: rev_quality,
+        }),
+        forward_metadata: ReadMetadata {
+            sequence_id: sequence.id.clone(),
+            start_pos: fwd_start,
+            end_pos: fwd_end,
+            is_reverse_complement: false,
+        },
+        reverse_metadata: Some(ReadMetadata {
+            sequence_id: sequence.id.clone(),
+            start_pos: rev_start,
+            end_pos: rev_end,
+            is_reverse_complement: true,
         }),
     };
 
@@ -466,6 +505,13 @@ pub fn simulate_long_read<T: error_profiles::ErrorProfile + ?Sized>(
             quality: read_quality,
         },
         reverse: None,
+        forward_metadata: ReadMetadata {
+            sequence_id: sequence.id.clone(),
+            start_pos: read_start,
+            end_pos: read_end,
+            is_reverse_complement: false,
+        },
+        reverse_metadata: None,
     };
 
     Ok(long_read)

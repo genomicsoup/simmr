@@ -191,7 +191,7 @@ pub struct CliArgs {
     // Attach the following format string to all read headers
     #[clap(
         long,
-        default_value = "@{:read_id:}|{:genome_id:}/{:pair:}",
+        default_value = "@{:read_id:}|{:genome_id:}/{:pair:} metadata:sid={:sequence_id:}|sp={:start_position:}|ep={:end_position:}|rc={:reverse_complement:}",
         value_parser,
         help = READ_FORMAT_HELP
     )]
@@ -204,9 +204,9 @@ pub struct CliArgs {
     #[clap(
         long,
         value_parser,
-        help = "Account for genome size when simulating reads at different abundances"
+        help = "Adjust by genome size when simulating reads at specific relative abundances"
     )]
-    pub consider_size: bool,
+    pub size_adjusted: bool,
 }
 
 /**
@@ -299,7 +299,7 @@ pub fn determine_abundance_profile(
     match args.abundance_profile {
         AbundanceProfile::Exact => Box::new(abundance_profiles::ExactAbundanceProfile {}),
         AbundanceProfile::Uniform => Box::new(abundance_profiles::UniformAbundanceProfile {
-            size_aware: args.consider_size,
+            size_adjusted: args.size_adjusted,
         }),
     }
 }

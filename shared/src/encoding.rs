@@ -116,6 +116,24 @@ pub struct ErrorModelParams {
     pub is_long: bool,
 }
 
+impl std::fmt::Display for ErrorModelParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+
+        s.push_str("<Error Model Params>\n");
+        s.push_str(&format!("bin_size: {}\n", self.bin_size));
+        s.push_str(&format!("bit_encoding: {}\n", self.bit_encoding));
+        s.push_str(&format!("kmer_size: {}\n", self.kmer_size));
+        s.push_str(&format!("insert_size_mean: {}\n", self.insert_size_mean));
+        s.push_str(&format!("insert_size_std: {}\n", self.insert_size_std));
+        s.push_str(&format!("read_length_mean: {}\n", self.read_length_mean));
+        s.push_str(&format!("read_length_std: {}\n", self.read_length_std));
+        s.push_str(&format!("is_long: {}\n", self.is_long));
+
+        write!(f, "{}", s)
+    }
+}
+
 /**
  * FUNCTIONS
  */

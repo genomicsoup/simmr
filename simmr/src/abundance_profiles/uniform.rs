@@ -7,12 +7,12 @@ use super::base;
 use crate::{abundance_profiles::base::coverage, genome};
 
 pub struct UniformAbundanceProfile {
-    pub size_aware: bool,
+    pub size_adjusted: bool,
 }
 
 impl base::AbundanceProfile for UniformAbundanceProfile {
     fn is_size_aware(&self) -> bool {
-        self.size_aware
+        self.size_adjusted
     }
 
     fn determine_abundances(

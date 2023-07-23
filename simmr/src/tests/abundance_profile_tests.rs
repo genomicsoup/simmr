@@ -6,7 +6,9 @@ use crate::abundance_profiles::{AbundanceProfile, UniformAbundanceProfile};
 
 #[test]
 fn test_uniform_profile() {
-    let up = UniformAbundanceProfile { size_aware: false };
+    let up = UniformAbundanceProfile {
+        size_adjusted: false,
+    };
     let abundances = up.determine_abundances(100, 5);
 
     assert!(abundances.len() == 5);

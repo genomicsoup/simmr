@@ -203,6 +203,7 @@ OPTIONS:
 - [x] Account for genome size when determining abundances
 - [x] Additional abundance options
 - [] Finish custom distribution implementation
+- [] Weight amount of simulated reads by reference sequence size
 - [] Distribution testing and plots
 - [] Add `--ani` option to generate sequences with an ANI close to the reference
 - [] Parallelize simulation and distribution functions

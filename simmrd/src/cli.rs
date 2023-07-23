@@ -2,20 +2,38 @@
  * file: cli.rs
  * desc: CLI parsing.
  */
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 /**
  * STRUCTS
  */
 
+//#[derive(Debug, Parser, Subcommand)]
 #[derive(Debug, Parser)]
-#[clap(version, about, long_about = None)]
-pub struct CliArgs {
+pub struct SimulateCommand {
+    #[clap(long, value_parser, help = "Distribution blob")]
+    pub distribution: String,
+    #[clap(
+        long,
+        value_parser,
+        help = "Simulate insert sizes and save to the given file"
+    )]
+    pub insert_size: Option<String>,
+}
+
+#[derive(Debug, Parser)]
+//#[clap(version, about, long_about = None)]
+//pub struct CliArgs {
+//#[derive(Debug, Parser, Subcommand)]
+pub struct GenerateCommand {
     #[clap(long, value_parser, help = "SAM file")]
     pub sam_file: Vec<String>,
 
     #[clap(long, value_parser, help = "Output file")]
     pub output: String,
+
+    #[clap(long, value_parser, help = "View distribution blob information")]
+    pub view: Option<String>,
 
     #[clap(
         long,
@@ -102,6 +120,19 @@ pub struct CliArgs {
         help = "Save sampled quality scores, read lengths, and insert sizes to files"
     )]
     pub save_intermediates: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    Generate(GenerateCommand),
+    Simulate(SimulateCommand),
+}
+
+#[derive(Debug, Parser)]
+#[clap(version, about, long_about = None)]
+pub struct CliArgs {
+    #[clap(subcommand)]
+    pub command: Command,
 }
 
 /**
