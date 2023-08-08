@@ -244,13 +244,16 @@ pub fn simulate_pe_read<T: error_profiles::ErrorProfile + ?Sized>(
 
         (new_rev_end, new_rev_end + read_length)
     } else {
-        //(fwd_end + insert_size, fwd_end + insert_size + read_length)
-        (
-            fwd_start + insert_size - read_length,
-            fwd_start + insert_size,
-        )
+        // could result in weird behavior if this is negative
+        if ((fwd_start + insert_size) as i32 - read_length as i32) < 0 {
+            (0, read_length)
+        } else {
+            (
+                fwd_start + insert_size - read_length,
+                fwd_start + insert_size,
+            )
+        }
     };
-    //println!("rev_end: {}", rev_end);
 
     // Generate the sequences from the genome
     let mut fwd_read = sequence.seq[fwd_start..fwd_end].to_owned();
