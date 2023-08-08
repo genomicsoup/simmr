@@ -87,11 +87,7 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
         };
 
         // Assume mean quality score of 30 and std. dev of 10
-        let normal = Normal::new(
-            util::convert_phred_to_probability(self.mean_phred_score),
-            10.0,
-        )
-        .unwrap();
+        let normal = Normal::new(self.mean_phred_score as f32, 10.0).unwrap();
         //let normal = Normal::new(util::convert_phred_to_accuracy(15), 0.01).unwrap();
 
         (0..seq_length)
@@ -99,8 +95,9 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
             .map(|_| rng.sample(&normal))
             //.map(util::convert_probability_to_phred)
             // Prevent accuracies > 1.0
-            .map(|acc| acc.min(0.9999))
-            .map(util::convert_accuracy_to_phred)
+            //.map(|acc| acc.min(0.9999))
+            //.map(util::convert_accuracy_to_phred)
+            .map(|p| p.floor() as u8)
             .collect::<Vec<u8>>()
     }
 
@@ -117,7 +114,7 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
 
         // These should be the same size, if not something is wrong. Simulate point mutations
         // using a uniform distribution
-        sequence
+        let s = sequence
             .iter()
             .zip(quality.iter())
             .into_iter()
@@ -137,7 +134,9 @@ impl base::ErrorProfile for MinimalShortErrorProfile {
                 }
             })
             .map(|nt| *nt)
-            .collect::<Vec<u8>>()
+            .collect::<Vec<u8>>();
+
+        s
     }
 
     fn minimum_genome_size(&self) -> u16 {
