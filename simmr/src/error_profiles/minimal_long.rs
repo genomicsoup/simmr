@@ -83,16 +83,18 @@ impl base::ErrorProfile for MinimalLongErrorProfile {
 
         // Assume mean accuracy 0.99 (phred score of 20) and a std. dev of 0.01, for long reads
         // which tend have worse quality scores this should probably be lowered
-        let normal =
-            Normal::new(util::convert_phred_to_accuracy(self.mean_phred_score), 10.0).unwrap();
+        //let normal =
+        //    Normal::new(util::convert_phred_to_accuracy(self.mean_phred_score), 10.0).unwrap();
+        let normal = Normal::new(self.mean_phred_score as f32, 10.0).unwrap();
 
         (0..seq_length)
             .into_iter()
             .map(|_| rng.sample(&normal))
             //.map(util::convert_probability_to_phred)
             // Prevent accuracies > 1.0
-            .map(|acc| acc.min(0.9999))
-            .map(util::convert_accuracy_to_phred)
+            //.map(|acc| acc.min(0.9999))
+            //.map(util::convert_accuracy_to_phred)
+            .map(|p| p.floor() as u8)
             .collect::<Vec<u8>>()
     }
 
