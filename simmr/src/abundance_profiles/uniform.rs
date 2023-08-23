@@ -63,14 +63,31 @@ impl base::AbundanceProfile for UniformAbundanceProfile {
         // abundance will stay the same but reads per genome may change. See trait docstring
         // for more info on this calculation. Formula is
         // genome reads = total coverage * total reads * rel. abundance / genome coverage
+        //genomes
+        //    .into_iter()
+        //    .zip(read_abundances)
+        //    .map(|(g, (nreads, abund))| {
+        //        (
+        //            ((total_coverage * total_reads * (*abund / 100.0))
+        //                / base::coverage(*nreads, read_length, g.size, true))
+        //            .ceil() as usize,
+        //            *abund,
+        //        )
+        //    })
+        //    .collect()
+
+        let total_adjusts: f64 = genomes
+            .into_iter()
+            .zip(read_abundances)
+            .map(|(g, (_, abund))| g.size as f64 * *abund)
+            .sum();
+
         genomes
             .into_iter()
             .zip(read_abundances)
             .map(|(g, (nreads, abund))| {
                 (
-                    ((total_coverage * total_reads * (*abund / 100.0))
-                        / base::coverage(*nreads, read_length, g.size, true))
-                    .ceil() as usize,
+                    (total_reads * ((*abund * g.size as f64) / total_adjusts)).ceil() as usize,
                     *abund,
                 )
             })
