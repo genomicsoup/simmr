@@ -21,7 +21,7 @@ pub struct GenomeRecord {
     #[serde(alias = "path")]
     pub filepath: String,
     pub uuid: Option<String>,
-    pub abundance: Option<f32>,
+    pub abundance: Option<f64>,
 }
 
 /**

@@ -79,6 +79,8 @@ pub enum AbundanceProfile {
     Exact,
     /// Generates a uniform abundance of all input genomes
     Uniform,
+    /// Custom abundances specified by the user in a genome file
+    Custom,
 }
 
 #[derive(Debug, Parser)]
@@ -295,11 +297,16 @@ pub fn determine_error_profile(args: &CliArgs) -> Box<dyn error_profiles::ErrorP
  */
 pub fn determine_abundance_profile(
     args: &CliArgs,
+    abundances: Option<Vec<f64>>,
 ) -> Box<dyn abundance_profiles::AbundanceProfile> {
     match args.abundance_profile {
         AbundanceProfile::Exact => Box::new(abundance_profiles::ExactAbundanceProfile {}),
         AbundanceProfile::Uniform => Box::new(abundance_profiles::UniformAbundanceProfile {
             size_adjusted: args.size_adjusted,
+        }),
+        AbundanceProfile::Custom => Box::new(abundance_profiles::CustomAbundanceProfile {
+            size_adjusted: args.size_adjusted,
+            abundances: abundances.unwrap(),
         }),
     }
 }

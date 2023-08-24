@@ -26,6 +26,7 @@ pub struct Genome {
     pub sequence: Vec<Seq>,
     pub size: usize,
     pub num_seqs: usize,
+    pub abundance: Option<f64>,
 }
 
 // Display impls to format for print and get a free to_string() impl
@@ -109,6 +110,7 @@ impl Genome {
             sequence: sequences.clone(),
             size: sequences.iter().map(|s| s.seq.len()).sum(),
             num_seqs: sequences.len(),
+            abundance: None,
         };
 
         Ok(genome)

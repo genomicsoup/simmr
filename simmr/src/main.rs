@@ -23,9 +23,8 @@ fn run_main() {
     // Set up logging
     log::setup_logging();
 
-    // Figure out which error and abundance profiles to use
+    // Figure out which error profile to use
     let eprofile = cli::determine_error_profile(&args);
-    let aprofile = cli::determine_abundance_profile(&args);
 
     // Check to make sure short/long args and custom profiles aren't mixed
     if args.error_profile == cli::ErrorProfile::CustomShort && eprofile.is_long_read() {
@@ -74,6 +73,19 @@ fn run_main() {
                 if rec.uuid.is_some() {
                     genome.uuid = genome::UUID::from(rec.uuid.as_ref().unwrap().clone());
                 }
+
+                // Abundances must be provided if this is a custom profile, fail if this isn't the
+                // case and update the genome abundances otherwise
+                //genome.abundance = rec.abundance;
+                if (args.abundance_profile == cli::AbundanceProfile::Custom) && rec.abundance.is_none() {
+                        error!(
+                            "You used a custom abundance profile but didn't provide abundances for genome {}", 
+                            genome
+                        );
+                        std::process::exit(1);
+                }
+
+                genome.abundance = rec.abundance;
 
                 genome
             })
@@ -143,6 +155,21 @@ fn run_main() {
     genomes
         .iter_mut()
         .for_each(|g| g.num_seqs = g.sequence.len());
+
+    // this is fucking stupid but whatever
+    let abundances = if args.abundance_profile == cli::AbundanceProfile::Custom {
+        Some(
+            genomes
+                .iter()
+                .map(|g| g.abundance.unwrap())
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        None
+    };
+
+    // Figure out which abundance profiles to use
+    let aprofile = cli::determine_abundance_profile(&args, abundances);
 
     // Simulate reads
     let reads = if eprofile.is_long_read() {
