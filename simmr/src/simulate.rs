@@ -177,7 +177,7 @@ pub fn simulate_pe_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>(
     for _ in 0..num_reads {
         // Select a random sequence from the genome
         //let i = rng.gen_range(0..genome.num_seqs);
-        let seq = genome.sequence[rng.gen_range(0..genome.num_seqs)].clone();
+        let seq = &genome.sequence[rng.gen_range(0..genome.num_seqs)];
         //let seq = genome.sequence[i].clone();
         let pe_seed: u64 = rng.gen();
 
