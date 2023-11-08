@@ -174,7 +174,9 @@ pub fn simulate_pe_reads_from_genome<T: error_profiles::ErrorProfile + ?Sized>(
         None => StdRng::from_entropy(),
     };
 
-    for _ in 0..num_reads {
+    // The simulate_pe_read function will generate two reads, so we only need to generate
+    // half as many reads as requested
+    for _ in 0..(num_reads / 2) {
         // Select a random sequence from the genome
         //let i = rng.gen_range(0..genome.num_seqs);
         let seq = &genome.sequence[rng.gen_range(0..genome.num_seqs)];
