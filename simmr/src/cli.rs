@@ -209,6 +209,14 @@ pub struct CliArgs {
         help = "Adjust by genome size when simulating reads at specific relative abundances"
     )]
     pub size_adjusted: bool,
+
+    //
+    #[clap(
+        long,
+        value_parser,
+        help = "Treat separate sequences in a genome as one contiguous sequence"
+    )]
+    pub contiguous: bool,
 }
 
 /**

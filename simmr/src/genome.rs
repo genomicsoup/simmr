@@ -4,6 +4,9 @@
  */
 use needletail::parse_fastx_file;
 use needletail::Sequence;
+use rand::rngs::StdRng;
+use rand::Rng;
+use rand::SeedableRng;
 use std::path;
 
 use crate::util;
@@ -21,12 +24,20 @@ pub struct Seq {
 
 #[derive(Debug, Clone)]
 pub struct Genome {
+    // Unique identifier for this genome
     pub uuid: UUID,
+    // Genome (FASTA) filepath
     pub filepath: path::PathBuf,
+    // Sequence records
     pub sequence: Vec<Seq>,
+    // Total genome size in bp
     pub size: usize,
+    // Number of sequences (separat records) in this genome
     pub num_seqs: usize,
+    // Abundance of this genome in simulated samples
     pub abundance: Option<f64>,
+    // If true, don't treat sequences as separate records but as a single contiguous sequence
+    pub contiguous: bool,
 }
 
 // Display impls to format for print and get a free to_string() impl
@@ -75,7 +86,7 @@ impl Genome {
     /**
      * Constructs a new Genome object from the given FASTA file.
      */
-    pub fn from_fasta(filepath: &str) -> Result<Genome, String> {
+    pub fn from_fasta(filepath: &str, contiguous: bool) -> Result<Genome, String> {
         // Holds all records for this fasta
         let mut sequences: Vec<Seq> = Vec::new();
         // Record iterator, any parse errors get returned to the caller
@@ -103,18 +114,81 @@ impl Genome {
             })
         }
 
-        let genome = Genome {
-            // this is broken so just disable it for now and replace it with something gross
-            uuid: UUID::from(util::generate_id(None)),
-            filepath: path::PathBuf::from(filepath),
-            sequence: sequences.clone(),
-            size: sequences.iter().map(|s| s.seq.len()).sum(),
-            num_seqs: sequences.len(),
-            abundance: None,
+        let genome = if contiguous {
+            Genome {
+                // this is broken so just disable it for now and replace it with something gross
+                uuid: UUID::from(util::generate_id(None)),
+                filepath: path::PathBuf::from(filepath),
+                sequence: vec![Seq {
+                    id: b"whole genome".to_vec(),
+                    uuid: util::generate_id(None),
+                    seq: sequences
+                        .iter()
+                        .map(|s| s.seq.clone())
+                        .flat_map(|s| s.into_iter().chain(std::iter::once(b'N')))
+                        .collect::<Vec<u8>>(),
+                    size: sequences.iter().map(|s| s.seq.len()).sum(),
+                }],
+                size: sequences.iter().map(|s| s.seq.len()).sum(),
+                num_seqs: 1,
+                abundance: None,
+                contiguous,
+            }
+        } else {
+            Genome {
+                // this is broken so just disable it for now and replace it with something gross
+                uuid: UUID::from(util::generate_id(None)),
+                filepath: path::PathBuf::from(filepath),
+                sequence: sequences.clone(),
+                size: sequences.iter().map(|s| s.seq.len()).sum(),
+                num_seqs: sequences.len(),
+                abundance: None,
+                contiguous,
+            }
         };
+
+        //let genome = Genome {
+        //    // this is broken so just disable it for now and replace it with something gross
+        //    uuid: UUID::from(util::generate_id(None)),
+        //    filepath: path::PathBuf::from(filepath),
+        //    sequence: sequences.clone(),
+        //    size: sequences.iter().map(|s| s.seq.len()).sum(),
+        //    num_seqs: sequences.len(),
+        //    abundance: None,
+        //    contiguous,
+        //};
 
         Ok(genome)
     }
+
+    /*
+    Return a random sequence from this genome.
+    If the genome is contiguous, this will return the entire genome as a single sequence.
+    pub fn random_sequence(&self, seed: Option<u64>) -> &Seq {
+        let mut rng = match seed {
+            Some(s) => StdRng::seed_from_u64(s),
+            None => StdRng::from_entropy(),
+        };
+        if !self.contiguous {
+            let idx = rng.gen_range(0..self.sequence.len());
+            &self.sequence[idx]
+        } else {
+            let seqs = &self
+                .sequence
+                .iter()
+                .map(|s| s.seq)
+                .flat_map(|s| s.iter().cloned().chain(std::iter::once(b'N')))
+                .collect::<Vec<u8>>();
+
+            &Seq {
+                id: b"whole genome".to_vec(),
+                uuid: util::generate_id(None),
+                seq: seqs.clone(),
+                size: seqs.len(),
+            }
+        }
+    }
+    */
 }
 
 #[cfg(test)]

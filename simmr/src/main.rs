@@ -59,7 +59,7 @@ fn run_main() {
             .iter()
             .map(|rec| {
                 // Try to parse
-                let result = genome::Genome::from_fasta(&rec.filepath);
+                let result = genome::Genome::from_fasta(&rec.filepath, args.contiguous);
 
                 // Fail on any errors
                 if result.is_err() {
@@ -96,7 +96,7 @@ fn run_main() {
             .iter()
             .map(|g| {
                 // Try to parse
-                let result = genome::Genome::from_fasta(&g);
+                let result = genome::Genome::from_fasta(&g, args.contiguous);
 
                 // Fail on any errors
                 if result.is_err() {
