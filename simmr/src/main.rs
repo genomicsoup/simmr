@@ -111,19 +111,41 @@ fn run_main() {
 
     info!("Ensuring genomes meet minimum sequence length requirements for simulation");
 
-    // Exclude any sequences which don't meet the required minimum size for the given error profile
-    genomes.iter_mut().for_each(|g| {
-        g.sequence = g
-            .sequence
-            .iter()
-            .filter(|s| {
-                if s.size <= eprofile.minimum_genome_size().into() {
-                    warn!(
+    // this is only necessary if we aren't using the contiguous option
+    // todo: there's an edge case this overlooks where the contiguous sequence is less than
+    // the minimum length needed for simulation, just fix this later
+    if !args.contiguous {
+        // Exclude any sequences which don't meet the required minimum size for the given error profile
+        genomes.iter_mut().for_each(|g| {
+            g.sequence = g
+                .sequence
+                .iter()
+                .filter(|s| {
+                    if s.size <= eprofile.minimum_genome_size().into() {
+                        warn!(
                         "({}) Sequence {} doesn't meet size requirements, size = {}, min size = {}",
                         g,
                         std::str::from_utf8(&s.id).unwrap(),
                         s.size,
                         eprofile.minimum_genome_size()
+                    );
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .cloned()
+                .collect();
+        });
+
+        // Now exclude genomes that no longer have sequences b/c they didn't meet the min length reqs
+        genomes = genomes
+            .iter()
+            .filter(|g| {
+                if g.sequence.len() == 0 {
+                    warn!(
+                        "Removing {} from simulation, it doesn't have usable sequences",
+                        g
                     );
                     false
                 } else {
@@ -132,29 +154,12 @@ fn run_main() {
             })
             .cloned()
             .collect();
-    });
 
-    // Now exclude genomes that no longer have sequences b/c they didn't meet the min length reqs
-    genomes = genomes
-        .iter()
-        .filter(|g| {
-            if g.sequence.len() == 0 {
-                warn!(
-                    "Removing {} from simulation, it doesn't have usable sequences",
-                    g
-                );
-                false
-            } else {
-                true
-            }
-        })
-        .cloned()
-        .collect();
-
-    // Update genome lengths in case things were filtered out
-    genomes
-        .iter_mut()
-        .for_each(|g| g.num_seqs = g.sequence.len());
+        // Update genome lengths in case things were filtered out
+        genomes
+            .iter_mut()
+            .for_each(|g| g.num_seqs = g.sequence.len());
+    }
 
     // this is fucking stupid but whatever
     let abundances = if args.abundance_profile == cli::AbundanceProfile::Custom {
