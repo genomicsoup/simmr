@@ -6,7 +6,7 @@ use crate::genome;
 
 #[test]
 fn test_genome_from_fasta() {
-    let genome = genome::Genome::from_fasta("src/tests/data/sample.fna").unwrap();
+    let genome = genome::Genome::from_fasta("src/tests/data/sample.fna", false).unwrap();
 
     assert!(genome.filepath.to_str().unwrap() == "src/tests/data/sample.fna");
     assert!(genome.num_seqs == 2);

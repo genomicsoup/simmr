@@ -18,9 +18,11 @@ fn test_simulate_pe_read_using_zero_error_profile() {
         read_length: 20,
         insert_size: 20,
     };
-    let genome =
-        genome::Genome::from_fasta("src/tests/data/GCF_000005845.2_ASM584v2_genomic.partial.fna")
-            .unwrap();
+    let genome = genome::Genome::from_fasta(
+        "src/tests/data/GCF_000005845.2_ASM584v2_genomic.partial.fna",
+        false,
+    )
+    .unwrap();
 
     // With this random seed, the generated seed should be 97132697663989775522 and the
     // read positions should be:
@@ -64,9 +66,11 @@ fn test_simulate_reads_using_zero_error_profile() {
         read_length: 20,
         insert_size: 20,
     };
-    let genome =
-        genome::Genome::from_fasta("src/tests/data/GCF_000005845.2_ASM584v2_genomic.partial.fna")
-            .unwrap();
+    let genome = genome::Genome::from_fasta(
+        "src/tests/data/GCF_000005845.2_ASM584v2_genomic.partial.fna",
+        false,
+    )
+    .unwrap();
 
     // With this random seed, the gen seed used by simulate_reads should be 6335..6202 and the
     // read positions should be:
