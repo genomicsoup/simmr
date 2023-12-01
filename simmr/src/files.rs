@@ -20,6 +20,7 @@ use crate::genome;
 pub struct GenomeRecord {
     #[serde(alias = "path")]
     pub filepath: String,
+    #[serde(alias = "id", alias = "genome_id")]
     pub uuid: Option<String>,
     pub abundance: Option<f64>,
 }
