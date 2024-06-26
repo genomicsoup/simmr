@@ -1,0 +1,42 @@
+name: docker image
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+
+env:
+  USER: genomicsoup
+  PACKAGE: simmr
+
+jobs:
+  build-image:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      
+      - name: login to ghcr
+        run: echo ${{ secrets.CR_TOKEN }} | docker login ghcr.io -u ${USER} --password-stdin
+
+      - name: Build image
+        run: |
+          export IMAGE=ghcr.io/${USER}/${PACKAGE}
+          export TAG=${{github.ref_name}}
+          export DOCKER_BUILDKIT=1
+          docker build \
+            -t ${IMAGE}:${GITHUB_SHA} \
+            -t ${IMAGE}:latest \
+            -t ${IMAGE}:${TAG/\//.} \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            .
+
+      - name: Push image
+        run: |
+          export IMAGE=ghcr.io/${USER}/${PACKAGE}
+          export TAG=${{github.ref_name}}
+          docker push ${IMAGE}:${GITHUB_SHA}
+          docker push ${IMAGE}:latest
+          docker push ${IMAGE}:${TAG/\//.}
