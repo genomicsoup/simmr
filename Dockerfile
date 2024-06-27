@@ -17,9 +17,12 @@ RUN cargo build --release
 # release layer
 FROM alpine:latest
 
+# add bash to the image for reasons
+RUN apk add --no-cache bash
+
 COPY --from=builder /home/rust/simmr/target/x86_64-unknown-linux-musl/release/simmr /usr/local/bin/simmr
 #COPY --from=builder /home/rust/simmr/target/aarch64-unknown-linux-musl/release/simmr /usr/local/bin/simmr
 #COPY --from=builder /home/rust/simmr/target/x86_64-unknown-linux-musl/release/simmr /usr/local/bin/simmr
 
-CMD /bin/sh
+CMD /bin/bash
 
