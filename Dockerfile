@@ -21,4 +21,5 @@ COPY --from=builder /home/rust/simmr/target/x86_64-unknown-linux-musl/release/si
 #COPY --from=builder /home/rust/simmr/target/aarch64-unknown-linux-musl/release/simmr /usr/local/bin/simmr
 #COPY --from=builder /home/rust/simmr/target/x86_64-unknown-linux-musl/release/simmr /usr/local/bin/simmr
 
-CMD /bin/bash
+CMD /bin/sh
+
